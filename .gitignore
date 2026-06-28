@@ -1,0 +1,8 @@
+build/
+dist/
+DerivedData/
+*.dmg
+.DS_Store
+*.xcodeproj
+.agents/
+.gemini/
