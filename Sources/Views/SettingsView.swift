@@ -45,22 +45,30 @@ struct SettingsView: View {
                     Spacer()
                     
                     // Social Links
-                    HStack(spacing: 12) {
-                        Link(destination: URL(string: "https://t.me/your_telegram_channel")!) {
-                            Image(systemName: "paperplane.circle.fill")
-                                .font(.title)
-                                .foregroundStyle(Color.brandStart)
+                    HStack(spacing: 16) {
+                        VStack(spacing: 4) {
+                            Link(destination: URL(string: "https://t.me/your_telegram_channel")!) {
+                                Image(systemName: "paperplane.circle.fill")
+                                    .font(.title)
+                                    .foregroundStyle(Color.brandStart)
+                            }
+                            .buttonStyle(.plain)
+                            Text("Telegram")
+                                .font(.system(size: 9))
+                                .foregroundColor(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .help("Telegram")
                         
-                        Link(destination: URL(string: "https://github.com/your_github_repo")!) {
-                            Image(systemName: "globe.americas.fill")
-                                .font(.title)
-                                .foregroundStyle(Color.primary)
+                        VStack(spacing: 4) {
+                            Link(destination: URL(string: "https://github.com/your_github_repo")!) {
+                                Image(systemName: "globe.americas.fill")
+                                    .font(.title)
+                                    .foregroundStyle(Color.primary)
+                            }
+                            .buttonStyle(.plain)
+                            Text("GitHub")
+                                .font(.system(size: 9))
+                                .foregroundColor(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .help("GitHub")
                     }
                 }
                 .padding(.horizontal, 8)
@@ -145,6 +153,10 @@ struct SettingsView: View {
                         Toggle("Показывать всплывающее уведомление (Toast)", isOn: $prefs.isToastEnabled)
                         
                         Toggle("Автоматически выделять весь текст (Cmd+A) при конвертации", isOn: $prefs.autoSelectAllText)
+                        
+                        Toggle("Переключать раскладку ввода после конвертации", isOn: $prefs.switchLayoutAfterConversion)
+                        
+                        Toggle("Сохранять историю конвертаций", isOn: $prefs.isHistoryEnabled)
                     }
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)

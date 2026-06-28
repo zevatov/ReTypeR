@@ -16,8 +16,8 @@ class LayoutMapper {
     private var availableLayouts: [TISInputSource] = []
     
     // Mapping dictionaries
-    private var aToBMap: [Character: Character] = [:]
-    private var bToAMap: [Character: Character] = [:]
+    var aToBMap: [Character: Character] = [:]
+    var bToAMap: [Character: Character] = [:]
     
     init() {
         refreshAvailableLayouts()
@@ -100,13 +100,37 @@ class LayoutMapper {
         let countA = text.filter { aToBMap.keys.contains($0) }.count
         let countB = text.filter { bToAMap.keys.contains($0) }.count
         
-        if countA > countB {
-            // Convert A to B
-            return String(text.map { aToBMap[$0] ?? $0 })
+        if countA != countB {
+            if countA > countB {
+                return String(text.map { aToBMap[$0] ?? $0 })
+            } else {
+                return String(text.map { bToAMap[$0] ?? $0 })
+            }
         } else {
-            // Convert B to A
+            // Tie-breaker: use active keyboard layout
+            if let currentSource = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+               let currentID = getLayoutID(for: currentSource) {
+                // If currently active layout is primary (A), convert A -> B
+                if currentID == PreferencesManager.shared.primaryLayoutID {
+                    return String(text.map { aToBMap[$0] ?? $0 })
+                } else {
+                    return String(text.map { bToAMap[$0] ?? $0 })
+                }
+            }
+            // Default fallback
             return String(text.map { bToAMap[$0] ?? $0 })
         }
+    }
+    
+    func switchToLayout(id: String) {
+        let filter: [CFString: Any] = [
+            kTISPropertyInputSourceID: id as CFString
+        ]
+        guard let list = TISCreateInputSourceList(filter as CFDictionary, false)?.takeRetainedValue() as? [TISInputSource],
+              let source = list.first else {
+            return
+        }
+        TISSelectInputSource(source)
     }
     
     // MARK: - Private Helpers

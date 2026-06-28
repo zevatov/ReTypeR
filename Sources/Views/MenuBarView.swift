@@ -16,7 +16,7 @@ struct MenuBarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("ReTypeR")
                         .font(.headline)
-                    Text("Активен (⌃⇧Space)")
+                    Text(prefs.isAppEnabled ? "Активен (⌃⇧Space)" : "Приостановлено")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -25,15 +25,15 @@ struct MenuBarView: View {
                 
                 // Status indicator
                 Circle()
-                    .fill(permissions.isAccessibilityGranted ? Color.green : Color.orange)
+                    .fill(statusColor)
                     .frame(width: 8, height: 8)
             }
-            .padding(.bottom, 4)
+            .padding(.bottom, 2)
             
             Divider()
             
             // Warnings (if any)
-            if !permissions.isAccessibilityGranted {
+            if prefs.isAppEnabled && !permissions.isAccessibilityGranted {
                 Button(action: {
                     WindowManager.shared.showOnboarding()
                 }) {
@@ -53,6 +53,14 @@ struct MenuBarView: View {
                 .buttonStyle(.plain)
             }
             
+            // Toggle for Enabler/Disabler
+            Toggle(isOn: $prefs.isAppEnabled) {
+                Text(prefs.isAppEnabled ? "Работает" : "Приостановлено")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .toggleStyle(.switch)
+            
             // Layout info
             VStack(alignment: .leading, spacing: 4) {
                 Text("Режим перевода:")
@@ -69,6 +77,54 @@ struct MenuBarView: View {
                         .fontWeight(.semibold)
                 }
                 .font(.subheadline)
+            }
+            
+            Divider()
+            
+            // History Section
+            VStack(alignment: .leading, spacing: 6) {
+                Text("История конвертаций:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                if !prefs.isHistoryEnabled {
+                    Text("История отключена в настройках")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .italic()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                } else if stats.history.isEmpty {
+                    Text("История пуста")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .italic()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(stats.history) { record in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(record.original)
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                    Text(record.converted)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+                                }
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.primary.opacity(0.03))
+                                .cornerRadius(4)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 120)
+                }
             }
             
             Divider()
@@ -98,44 +154,46 @@ struct MenuBarView: View {
             
             Divider()
             
-            // Action Buttons
-            VStack(spacing: 6) {
+            // Redesigned Action Buttons (HStack)
+            HStack(spacing: 8) {
                 Button(action: {
                     WindowManager.shared.showSettings()
                 }) {
                     HStack {
+                        Spacer()
                         Image(systemName: "gearshape")
-                        Text("Настройки...")
                         Spacer()
                     }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 8)
-                    .contentShape(Rectangle())
+                    .padding(.vertical, 8)
                 }
                 .buttonStyle(.plain)
                 .background(Color.primary.opacity(0.04))
                 .cornerRadius(6)
                 
                 Button(action: {
-                    NSApplication.shared.terminate(nil)
+                    (NSApplication.shared.delegate as? AppDelegate)?.confirmExit()
                 }) {
                     HStack {
+                        Spacer()
                         Image(systemName: "power")
-                        Text("Выйти")
                         Spacer()
                     }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 8)
-                    .contentShape(Rectangle())
+                    .padding(.vertical, 8)
+                    .foregroundColor(.white)
                 }
                 .buttonStyle(.plain)
-                .background(Color.primary.opacity(0.04))
+                .background(Color.red)
                 .cornerRadius(6)
             }
         }
         .padding(16)
-        .frame(width: 250)
+        .frame(width: 250, height: 420)
         .background(.ultraThinMaterial)
+    }
+    
+    private var statusColor: Color {
+        if !prefs.isAppEnabled { return .red }
+        return permissions.isAccessibilityGranted ? .green : .orange
     }
     
     private func getLayoutName(id: String) -> String {
@@ -143,7 +201,6 @@ struct MenuBarView: View {
         if let layout = layouts.first(where: { $0.id == id }) {
             return layout.localizedName
         }
-        // Fallback to name extraction from bundle ID
         return id.components(separatedBy: ".").last ?? id
     }
 }

@@ -10,9 +10,8 @@ struct ReTypeRApp: App {
     }
     
     var body: some Scene {
-        MenuBarExtra("ReTypeR", systemImage: "keyboard.badge.ellipsis") {
-            MenuBarView()
+        Settings {
+            EmptyView()
         }
-        .menuBarExtraStyle(.window)
     }
 }

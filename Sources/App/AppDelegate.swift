@@ -1,8 +1,12 @@
 import Cocoa
 import Combine
+import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
+    
+    var statusItem: NSStatusItem!
+    var popover: NSPopover!
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Check Accessibility permission on startup
@@ -14,6 +18,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 WindowManager.shared.showOnboarding()
             }
         }
+        
+        // Setup status item manually for left/right click distinction
+        setupStatusItem()
         
         // Setup hotkey listener when accessibility permission is granted
         PermissionsManager.shared.$isAccessibilityGranted
@@ -32,5 +39,123 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 WindowManager.shared.showToast(original: original, converted: converted)
             }
             .store(in: &cancellables)
+            
+        // Reactively update menu bar status icon on settings changes
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateStatusIcon()
+            }
+            .store(in: &cancellables)
+            
+        // Reactively update menu bar status icon on permission changes
+        PermissionsManager.shared.$isAccessibilityGranted
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateStatusIcon()
+            }
+            .store(in: &cancellables)
+    }
+    
+    func setupStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem.button {
+            button.action = #selector(statusItemClicked(_:))
+            button.target = self
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+        
+        popover = NSPopover()
+        // Allow popover size to adapt or be fixed
+        popover.contentSize = NSSize(width: 250, height: 420)
+        popover.behavior = .transient
+        popover.contentViewController = NSHostingController(rootView: MenuBarView())
+        
+        updateStatusIcon()
+    }
+    
+    @objc func statusItemClicked(_ sender: Any?) {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp {
+            showRightClickMenu()
+        } else {
+            togglePopover()
+        }
+    }
+    
+    func togglePopover() {
+        if popover.isShown {
+            popover.performClose(nil)
+        } else if let button = statusItem.button {
+            NSApp.activate(ignoringOtherApps: true)
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
+    }
+    
+    func showRightClickMenu() {
+        let menu = NSMenu()
+        
+        let settingsItem = NSMenuItem(title: "Настройки...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let quitItem = NSMenuItem(title: "Выйти", action: #selector(terminateApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+        
+        if let button = statusItem.button {
+            let pt = NSPoint(x: 0, y: button.bounds.height)
+            menu.popUp(positioning: nil, at: pt, in: button)
+        }
+    }
+    
+    @objc func openSettings() {
+        Task { @MainActor in
+            WindowManager.shared.showSettings()
+        }
+    }
+    
+    @objc func terminateApp() {
+        confirmExit()
+    }
+    
+    func confirmExit() {
+        let alert = NSAlert()
+        alert.messageText = "Выход"
+        alert.informativeText = "Вы действительно хотите выйти из приложения?"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Выйти")
+        alert.addButton(withTitle: "Отмена")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            NSApplication.shared.terminate(nil)
+        }
+    }
+    
+    func updateStatusIcon() {
+        guard let button = statusItem?.button else { return }
+        
+        let isEnabled = PreferencesManager.shared.isAppEnabled
+        let isGranted = PermissionsManager.shared.isAccessibilityGranted
+        
+        let statusColor: NSColor
+        if !isEnabled {
+            statusColor = .systemRed
+        } else if !isGranted {
+            statusColor = .systemOrange
+        } else {
+            statusColor = .systemGreen
+        }
+        
+        let config = NSImage.SymbolConfiguration(paletteColors: [.labelColor, statusColor])
+        if let image = NSImage(systemSymbolName: "keyboard.badge.ellipsis", accessibilityDescription: "ReTypeR")?
+            .withSymbolConfiguration(config) {
+            button.image = image
+        } else {
+            button.image = NSImage(systemSymbolName: "keyboard.badge.ellipsis", accessibilityDescription: "ReTypeR")
+        }
     }
 }
