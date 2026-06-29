@@ -151,10 +151,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         let baseImage = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "ReTypeR") ?? NSImage()
+        let tintedKeyboard = baseImage.tinted(with: .white)
         let size = NSSize(width: 22, height: 18)
         let compositeImage = NSImage(size: size, flipped: false) { rect in
-            NSColor.white.set()
-            
             let keyboardSize = NSSize(width: 17, height: 11)
             let keyboardRect = NSRect(
                 x: 0,
@@ -162,7 +161,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 width: keyboardSize.width,
                 height: keyboardSize.height
             )
-            baseImage.draw(in: keyboardRect)
+            tintedKeyboard.draw(in: keyboardRect)
             
             // Draw the status dot in the bottom right corner with a tiny gap
             let dotRadius: CGFloat = 2.5
@@ -187,5 +186,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         compositeImage.isTemplate = false
         button.image = compositeImage
+    }
+}
+
+extension NSImage {
+    func tinted(with color: NSColor) -> NSImage {
+        guard let representation = bestRepresentation(for: NSRect(origin: .zero, size: size), context: nil, hints: nil) else {
+            return self
+        }
+        let tintedImage = NSImage(size: size)
+        tintedImage.isTemplate = false
+        tintedImage.addRepresentation(NSCustomImageRep(size: size, flipped: false) { rect in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            context.saveGState()
+            
+            representation.draw(in: rect)
+            
+            context.setBlendMode(.sourceIn)
+            color.set()
+            rect.fill()
+            
+            context.restoreGState()
+            return true
+        })
+        return tintedImage
     }
 }

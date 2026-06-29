@@ -12,7 +12,9 @@ class WindowManager: ObservableObject {
     @MainActor
     func showSettings() {
         if let window = settingsWindow {
+            window.orderFrontRegardless()
             window.makeKeyAndOrderFront(nil)
+            window.makeKey()
             NSApp.activate(ignoringOtherApps: true)
             return
         }

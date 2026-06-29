@@ -49,6 +49,7 @@ struct SettingsView: View {
                             Link(destination: URL(string: "https://t.me/your_telegram_channel")!) {
                                 VStack(spacing: 4) {
                                     Image("telegram")
+                                        .renderingMode(.template)
                                         .resizable()
                                         .aspectRatio(contentMode: .fit)
                                         .frame(width: 24, height: 24)
@@ -63,6 +64,7 @@ struct SettingsView: View {
                             Link(destination: URL(string: "https://github.com/your_github_repo")!) {
                                 VStack(spacing: 4) {
                                     Image("github")
+                                        .renderingMode(.template)
                                         .resizable()
                                         .aspectRatio(contentMode: .fit)
                                         .frame(width: 24, height: 24)
@@ -258,12 +260,14 @@ struct SettingsView: View {
                                         Text("История")
                                             .font(.body)
                                             .foregroundColor(.primary)
+                                            .multilineTextAlignment(.center)
                                         Text(isHistoryExpanded ? "Скрыть" : "Показать")
                                             .font(.system(size: 9))
                                             .foregroundColor(.secondary)
+                                            .multilineTextAlignment(.center)
                                     }
                                     .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity)
+                                    .frame(maxWidth: .infinity, alignment: .center)
                                     .background(Color.primary.opacity(isHistoryExpanded ? 0.08 : 0.03))
                                     .cornerRadius(8)
                                     .overlay(
@@ -284,11 +288,12 @@ struct SettingsView: View {
                                         Text("Сбросить")
                                             .font(.body)
                                             .foregroundColor(.red)
+                                            .multilineTextAlignment(.center)
                                         Text(" ") // Spacer to keep heights equal
                                             .font(.system(size: 9))
                                     }
                                     .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity)
+                                    .frame(maxWidth: .infinity, alignment: .center)
                                     .background(Color.red.opacity(0.06))
                                     .cornerRadius(8)
                                     .overlay(
