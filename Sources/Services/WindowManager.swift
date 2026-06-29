@@ -107,10 +107,10 @@ class WindowManager: ObservableObject {
         
         let toastView = ConversionToast(original: original, converted: converted)
         let hostingView = NSHostingView(rootView: toastView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 340, height: 90)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 56)
         
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: 90),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 56),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -125,7 +125,7 @@ class WindowManager: ObservableObject {
         // Position toast at bottom-center of the main screen
         if let screen = NSScreen.main {
             let screenRect = screen.visibleFrame
-            let x = screenRect.origin.x + (screenRect.size.width - 340) / 2
+            let x = screenRect.origin.x + (screenRect.size.width - 320) / 2
             let y = screenRect.origin.y + 40 // 40pt above dock/bottom
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         }

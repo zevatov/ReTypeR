@@ -23,7 +23,7 @@ targets:
       CODE_SIGN_STYLE: Automatic
       CODE_SIGN_ENTITLEMENTS: ""
       ENABLE_HARDENED_RUNTIME: NO
-      MARKETING_VERSION: "1.1.0"
+      MARKETING_VERSION: "1.1.2"
   ReTypeRTests:
     type: bundle.unit-test
     platform: macOS

@@ -50,4 +50,17 @@ final class LayoutMapperTests: XCTestCase {
         XCTAssertEqual(LayoutMapper.shared.convert("ghjdthbv]"), "проверимъ")
         XCTAssertEqual(LayoutMapper.shared.convert("проверимъ"), "ghjdthbv]")
     }
+    
+    func testSmartRecognition() {
+        PreferencesManager.shared.isSmartRecognitionEnabled = true
+        
+        // 1. Text: "Привет, ghbdtn!" (Mixed: Russian is correct, English is wrong)
+        XCTAssertEqual(LayoutMapper.shared.convert("Привет, ghbdtn!"), "Привет, привет!")
+        
+        // 2. Text: "hello, ghbdtn!" (Mixed: English "hello" is correct, "ghbdtn" is wrong)
+        XCTAssertEqual(LayoutMapper.shared.convert("hello, ghbdtn!"), "hello, привет!")
+        
+        // 3. Text: "руддщ, привет!" (Mixed: Russian "привет" is correct, "руддщ" is wrong)
+        XCTAssertEqual(LayoutMapper.shared.convert("руддщ, привет!"), "hello, привет!")
+    }
 }

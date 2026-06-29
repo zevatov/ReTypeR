@@ -9,6 +9,7 @@ class PreferencesManager: ObservableObject {
     @AppStorage("switchLayoutAfterConversion") var switchLayoutAfterConversion: Bool = true
     @AppStorage("isAppEnabled") var isAppEnabled: Bool = true
     @AppStorage("isHistoryEnabled") var isHistoryEnabled: Bool = true
+    @AppStorage("isSmartRecognitionEnabled") var isSmartRecognitionEnabled: Bool = true
     
     @AppStorage("primaryLayoutID") var primaryLayoutID: String = "com.apple.keylayout.US"
     @AppStorage("secondaryLayoutID") var secondaryLayoutID: String = "com.apple.keylayout.RussianWin"

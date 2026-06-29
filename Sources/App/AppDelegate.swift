@@ -150,12 +150,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             statusColor = .systemGreen
         }
         
-        let config = NSImage.SymbolConfiguration(paletteColors: [.labelColor, statusColor])
-        if let image = NSImage(systemSymbolName: "keyboard.badge.ellipsis", accessibilityDescription: "ReTypeR")?
-            .withSymbolConfiguration(config) {
-            button.image = image
-        } else {
-            button.image = NSImage(systemSymbolName: "keyboard.badge.ellipsis", accessibilityDescription: "ReTypeR")
+        let baseImage = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "ReTypeR") ?? NSImage()
+        let size = NSSize(width: 22, height: 18)
+        let compositeImage = NSImage(size: size, flipped: false) { rect in
+            NSColor.white.set()
+            
+            let keyboardSize = NSSize(width: 17, height: 11)
+            let keyboardRect = NSRect(
+                x: 0,
+                y: (rect.height - keyboardSize.height) / 2,
+                width: keyboardSize.width,
+                height: keyboardSize.height
+            )
+            baseImage.draw(in: keyboardRect)
+            
+            // Draw the status dot in the bottom right corner with a tiny gap
+            let dotRadius: CGFloat = 2.5
+            let dotRect = NSRect(
+                x: rect.width - dotRadius * 2,
+                y: 1,
+                width: dotRadius * 2,
+                height: dotRadius * 2
+            )
+            
+            // Draw a stroke/background under the dot for high contrast in all themes
+            let strokePath = NSBezierPath(ovalIn: dotRect.insetBy(dx: -0.75, dy: -0.75))
+            NSColor.windowBackgroundColor.set()
+            strokePath.fill()
+            
+            let path = NSBezierPath(ovalIn: dotRect)
+            statusColor.set()
+            path.fill()
+            
+            return true
         }
+        
+        compositeImage.isTemplate = false
+        button.image = compositeImage
     }
 }
