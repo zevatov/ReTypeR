@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds ReTypeR.app (Release) and packages it into a drag-and-drop DMG
-# ("ReTypeR 1.3 Бета") at the repo root.
+# ("ReTypeR 1.3.4") at the repo root.
 #
 # The DMG contains the app next to an /Applications symlink, so installation
 # is a single drag in Finder.
@@ -15,7 +15,7 @@ APP_NAME="ReTypeR"
 # "ReTypeR.app" (renaming it broke the test host and re-linked binaries after
 # signing); the rename to the versioned name happens in STAGING below, with a
 # re-sign of the renamed bundle.
-INSTALLED_NAME="ReTypeR 1.3.3"
+INSTALLED_NAME="ReTypeR 1.3.4"
 DMG_TITLE="$INSTALLED_NAME"
 DMG_PATH="$ROOT/$INSTALLED_NAME.dmg"
 BUILD_DIR="$ROOT/build/DerivedData"

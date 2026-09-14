@@ -1,16 +1,18 @@
-# ReTypeR — дорожная карта v1.3.3
+# ReTypeR — дорожная карта v1.3.4
 
-> ✅ **АКТУАЛЬНОЕ СОСТОЯНИЕ НА 2026-09-14 (v1.3.3 / build 4):**
+> ✅ **АКТУАЛЬНОЕ СОСТОЯНИЕ НА 2026-09-14 (v1.3.4 / build 5):**
 > Продуктовый OCR-режим **удалён из прод-кода 2026-09-14** (решение владельца):
 > захват экрана, Vision OCR, Screen Recording, UI-тумблер и хоткей ⌃⇧O убраны;
 > онбординг/настройки требуют только Accessibility. Scoring-класс C и
 > [`ConversionSource.ocr`](../Sources/Core/SmartScorer.swift:8) сохранены как
 > внутренний scoring-флаг. `xcodebuild test`: 61 test / 0 failures.
-> Релиз v1.3.3 (2026-09-12) собран и верифицирован: CAPS/Shift-символы, внутренняя
-> пунктуация, фонотактический фильтр, мультимониторный статус-бар. Артефакт
-> `ReTypeR 1.3.3.dmg` подписан персональным сертификатом Apple Development
-> (`fonXXXX@mail.ru`, Team `3ZMM…J2P`, Hardened Runtime); notarization не выполнялся.
-> Текущий план доработок документации/UX аудита: [`docs/ref-audit-handoffs.md`](ref-audit-handoffs.md).
+> Релиз v1.3.4 — патч после вырезки OCR (build 5). Предыдущий верифицированный
+> релиз v1.3.3 (2026-09-12): CAPS/Shift-символы, внутренняя пунктуация,
+> фонотактический фильтр, мультимониторный статус-бар. Артефакт
+> `ReTypeR 1.3.4.dmg` собирается [`scripts/build_dmg.sh`](../scripts/build_dmg.sh)
+> с персональным сертификатом Apple Development (`fonXXXX@mail.ru`,
+> Team `3ZMM…J2P`, Hardened Runtime); notarization не выполнялся.
+> Текущий план: [`docs/ref-audit-handoffs.md`](ref-audit-handoffs.md).
 
 ## Текущее состояние (evidence на 2026-09-14)
 
@@ -23,7 +25,7 @@
 | Мультимониторный статус-бар | ✅ исправлен | Чистый `com.retyper.app`, отказ от `autosaveName`, прямое рисование SF Symbol с динамической палитрой |
 | OCR / Approach S | ⛔ **removed from prod (2026-09-14)** | [`Sources/Core/OCRService.swift`](../Sources/Core/OCRService.swift) удалён; `NSScreenCaptureUsageDescription` отсутствует в [`Info.plist`](../Sources/App/Info.plist) и [`project.yml`](../project.yml); [`PermissionsManager.swift`](../Sources/Services/PermissionsManager.swift) без Screen Recording; хоткей `ocrCapture` и pref `isOCRModeEnabled` удалены. Scoring-флаг [`ConversionSource.ocr`](../Sources/Core/SmartScorer.swift:8) сохранён |
 | Тесты | ✅ 61/61 | `xcodebuild test` — 61 тест / 0 failures: `AlgorithmStressTests`, `FrequencyAndCaptureTests`, `LayoutMapperTests`, `LogRegressionTests` (включая живые OCR-scoring-тесты `testOCRBasicModeMatchesHotkeyBasicMode`, `testLog07HyphenatedOcrJunkUntouched`) |
-| Build / release | ✅ DMG 1.3.3 собран и подписан | `ReTypeR 1.3.3.dmg` (2.7 MB), SHA-256 `d701076c...`, Apple Development, Hardened Runtime |
+| Build / release | ✅ DMG 1.3.4 собран и подписан | `ReTypeR 1.3.4.dmg` (2.5 MB), SHA-256 `4fdaeeb2667b56d4350bae87efe30065668fe5adb92ec2c88e2b271f4749d8d1`, Apple Development, Team `3ZMM…J2P`, Hardened Runtime; `hdiutil verify` VALID; в бандле `CFBundleShortVersionString=1.3.4`, `CFBundleVersion=5`, без `NSScreenCaptureUsageDescription` |
 | Privacy opt-in | ✅ | история opt-in: [`isHistoryEnabled`](../Sources/Services/PreferencesManager.swift:12); лог opt-in: [`ConversionLogger.log`](../Sources/Services/ConversionLogger.swift:23) |
 | Robustness | ✅ | AX timeout [`TextService.applyMessagingTimeout`](../Sources/Core/TextService.swift:59); single-instance via [`LSMultipleInstancesProhibited`](../Sources/App/Info.plist:25) — это plist-настройка LaunchServices, а не runtime-инвариант: сам факт НЕ гарантирует отсутствие дублей во всех сценариях запуска |
 | Разрешения (TCC) | ✅ только Accessibility | онбординг/настройки запрашивают только Accessibility; Screen Recording не запрашивается (OCR removed from prod) |

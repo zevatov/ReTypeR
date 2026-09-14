@@ -4,12 +4,14 @@
 
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/).
 
-## [Unreleased] — Удаление продуктового OCR-режима (2026-09-14)
+## [Unreleased]
+
+## [1.3.4] — 2026-09-14
 
 ### Removed
 
-- **Продуктовый OCR-режим вырезан из прод-кода (2026-09-14)**: захват видимой
-  области экрана (`screencapture` CLI / ScreenCaptureKit), Vision-пайплайн,
+- **Продуктовый OCR-режим вырезан из прод-кода**: захват видимой области
+  экрана (`screencapture` CLI / ScreenCaptureKit), Vision-пайплайн,
   разрешение Screen Recording (`NSScreenCaptureUsageDescription` из
   [`Info.plist`](Sources/App/Info.plist) и [`project.yml`](project.yml)),
   UI (тумблер «OCR-режим», онбординг-промпт), хоткей `ocrCapture` (⌃⇧O)
@@ -20,11 +22,17 @@
   (тесты `testOCRBasicModeMatchesHotkeyBasicMode`,
   `testLog07HyphenatedOcrJunkUntouched` живы) — OCR больше не продуктовая
   поверхность, только scoring-семантика.
-- Документация синхронизирована: README/SECURITY не описывают OCR/Screen
-  Recording как текущую функцию; аудиторские этапы 1–4 и ручные сценарии
-  T-O-01…T-O-08 / T-C-01 закрыты как N/A.
 
-## [Unreleased] — Этап 0 (documentation & audit-каркас)
+### Changed
+
+- Версия приложения: **1.3.4 / build 5** (`MARKETING_VERSION`,
+  `CURRENT_PROJECT_VERSION`, `CFBundleDisplayName`,
+  [`scripts/build_dmg.sh`](scripts/build_dmg.sh) → `ReTypeR 1.3.4.dmg`).
+- Документация синхронизирована с вырезкой OCR: README/SECURITY не описывают
+  OCR/Screen Recording как текущую функцию; аудиторские этапы 1–4 и ручные
+  сценарии T-O-01…T-O-08 / T-C-01 закрыты как N/A.
+
+## [1.3.3] docs — Этап 0 (documentation & audit-каркас, 2026-09-13)
 
 ### Добавлено (docs)
 

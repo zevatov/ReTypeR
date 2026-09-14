@@ -31,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else {
             // Show brief welcoming toast so user immediately sees that ReTypeR has launched in the menu bar
-            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.3"
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.4"
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 WindowManager.shared.showInfoToast(message: "ReTypeR \(version) запущен в строке меню")
             }

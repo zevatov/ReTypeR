@@ -32,7 +32,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("ReTypeR")
                             .font(.system(size: 18, weight: .bold))
-                        Text("Умная смена раскладки клавиатуры • Версия \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3")")
+                        Text("Умная смена раскладки клавиатуры • Версия \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.4")")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
@@ -55,7 +55,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
 
-                        Link(destination: URL(string: "https://github.com")!) {
+                        Link(destination: URL(string: "https://github.com/zevatov/ReTypeR")!) {
                             HStack(spacing: 4) {
                                 Image(systemName: "curlybraces")
                                     .font(.system(size: 11))

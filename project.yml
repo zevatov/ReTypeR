@@ -13,8 +13,8 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.3.3"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "1.3.4"
+    CURRENT_PROJECT_VERSION: "5"
     # Real Apple Development identity (stable Team ID): amfid on current
     # macOS rejects ad-hoc signatures at launch ("The file is adhoc signed
     # or signed by an unknown certificate chain"), so Development-identity
@@ -54,7 +54,7 @@ targets:
     info:
       path: Sources/App/Info.plist
       properties:
-        CFBundleDisplayName: ReTypeR 1.3.3
+        CFBundleDisplayName: ReTypeR 1.3.4
         CFBundleName: ReTypeR
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         # Keep versions resolved from build settings (single source of truth

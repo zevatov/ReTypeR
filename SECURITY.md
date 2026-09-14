@@ -1,6 +1,6 @@
 # SECURITY.md — модель угроз ReTypeR
 
-> Версия: 1.3.3 / build 4 · Обновлён: 2026-09-14 · Связанный план: [`docs/ref-audit-handoffs.md`](docs/ref-audit-handoffs.md)
+> Версия: 1.3.4 / build 5 · Обновлён: 2026-09-14 · Связанный план: [`docs/ref-audit-handoffs.md`](docs/ref-audit-handoffs.md)
 
 > **Изменение 2026-09-14:** продуктовый OCR-режим (захват видимой области экрана,
 > Vision OCR, разрешение Screen Recording, UI/хоткей/pref) **удалён из прод-кода**.
