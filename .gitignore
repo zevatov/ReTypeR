@@ -1,8 +1,47 @@
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Xcode & XcodeGen (project is generated via project.yml)
+*.xcodeproj
+xcuserdata/
+*.xcworkspace
+!default.xcworkspace
+DerivedData/
+*.hmap
+*.xccheckout
+*.xcscmblueprint
+
+# Swift Package Manager
+.build/
+Packages/
+Package.pins
+
+# Build & Release Artifacts
 build/
 dist/
-DerivedData/
 *.dmg
-.DS_Store
-*.xcodeproj
-.agents/
+*.app
+*.zip
+*.tar.gz
+*.pkg
+*.dSYM/
+*.upload
+*.log
+
+# Editor & AI Tool Metadata
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.qoder/
 .gemini/
+.agents/
+
+# Scratch & Temporary transcripts
+roo_task_*.md

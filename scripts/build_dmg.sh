@@ -1,67 +1,84 @@
 #!/bin/bash
+# Builds ReTypeR.app (Release) and packages it into a drag-and-drop DMG
+# ("ReTypeR 1.3 Бета") at the repo root.
+#
+# The DMG contains the app next to an /Applications symlink, so installation
+# is a single drag in Finder.
+set -euo pipefail
 
-# Exit on error
-set -e
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
-PROJECT_DIR="/Users/stanislav/Desktop/проекты/ReTypeR"
+APP_NAME="ReTypeR"
+# Installed .app name is versioned so multiple installed versions are
+# distinguishable in /Applications (owner request). The BUILD product stays
+# "ReTypeR.app" (renaming it broke the test host and re-linked binaries after
+# signing); the rename to the versioned name happens in STAGING below, with a
+# re-sign of the renamed bundle.
+INSTALLED_NAME="ReTypeR 1.3.3"
+DMG_TITLE="$INSTALLED_NAME"
+DMG_PATH="$ROOT/$INSTALLED_NAME.dmg"
+BUILD_DIR="$ROOT/build/DerivedData"
+APP_PATH="$BUILD_DIR/Build/Products/Release/$APP_NAME.app"
+STAGING="$ROOT/build/dmg-staging"
+STAGED_APP_PATH="$STAGING/$INSTALLED_NAME.app"
+SIGN_IDENTITY="Apple Development"
 
-log() {
-    echo "[BuildDMG] $1"
+echo "==> Building Release configuration…"
+xcodebuild build \
+    -project "$ROOT/$APP_NAME.xcodeproj" \
+    -scheme "$APP_NAME" \
+    -configuration Release \
+    -destination 'platform=macOS' \
+    -derivedDataPath "$BUILD_DIR" \
+    -quiet
+
+if [ ! -d "$APP_PATH" ]; then
+    echo "ERROR: $APP_PATH not found after build" >&2
+    exit 1
+fi
+
+echo "==> Cleaning extended attributes (codesign detritus guard)…"
+xattr -cr "$APP_PATH" 2>/dev/null || true
+
+echo "==> Preparing drag-and-drop staging folder (copying to versioned name)…"
+rm -rf "$STAGING"
+mkdir -p "$STAGING"
+# Copying straight to the versioned name IS the rename.
+cp -R "$APP_PATH" "$STAGED_APP_PATH"
+
+echo "==> Re-signing the RENAMED bundle (Apple Development identity, hardened runtime)…"
+# TCC (Accessibility; Screen Recording removed 2026-09-14 with OCR mode) persists per code signature. Ad-hoc
+# signatures change on every rebuild, so granted permissions silently reset.
+# The Apple Development identity carries a stable Team ID — sign with it so
+# permissions granted once survive rebuilds and updates. Signing happens AFTER
+# the rename so the seal covers the final bundle shape.
+xattr -cr "$STAGED_APP_PATH" 2>/dev/null || true
+codesign --force --deep --sign "$SIGN_IDENTITY" --options runtime --timestamp=none "$STAGED_APP_PATH"
+
+echo "==> Verifying signature…"
+codesign --verify --deep --strict "$STAGED_APP_PATH" || {
+    echo "ERROR: codesign verification failed" >&2
+    exit 1
 }
+codesign -dv "$STAGED_APP_PATH" 2>&1 | grep -E "Authority|TeamIdentifier" || true
 
-# 1. Prepare assets (crops logo, overwrites appiconset files and builds ICNS)
-log "Running prepare_assets.swift..."
-swift "$PROJECT_DIR/scripts/prepare_assets.swift"
+echo "==> Staged app size:"
+du -sh "$STAGED_APP_PATH"
 
-# 2. Clean previous build caches to force Xcode to compile the new icons
-log "Cleaning up old build cache..."
-rm -f "$PROJECT_DIR/ReTypeR.dmg"
-rm -rf "$PROJECT_DIR/dist"
-rm -rf "$PROJECT_DIR/build"
-mkdir -p "$PROJECT_DIR/dist"
+# Drag-and-drop target: standard /Applications symlink.
+ln -s /Applications "$STAGING/Applications"
 
-# Regenerate xcode project with new bundle identifier
-log "Regenerating Xcode project using xcodegen..."
-xcodegen generate
+echo "==> Removing stale DMG…"
+rm -f "$DMG_PATH"
 
-# 3. Rebuild the application from scratch
-log "Compiling ReTypeR app with new icon assets..."
-xcodebuild -project "$PROJECT_DIR/ReTypeR.xcodeproj" \
-           -scheme ReTypeR \
-           -configuration Release \
-           -derivedDataPath "$PROJECT_DIR/build/DerivedData" \
-           CODE_SIGN_IDENTITY="" \
-           CODE_SIGNING_REQUIRED=NO \
-           CODE_SIGNING_ALLOWED=NO
+echo "==> Creating DMG…"
+hdiutil create -volname "$DMG_TITLE" \
+    -srcfolder "$STAGING" \
+    -ov -format UDZO \
+    "$DMG_PATH"
 
-# 4. Strip iCloud metadata/extended attributes from build folder and sign
-log "Stripping attributes and signing app bundle..."
-xattr -cr "$PROJECT_DIR/build/DerivedData/Build/Products/Release/ReTypeR.app"
-codesign --force --sign - --timestamp=none "$PROJECT_DIR/build/DerivedData/Build/Products/Release/ReTypeR.app"
+rm -rf "$STAGING"
 
-# 5. Copy built app to dist/
-BUILT_APP="$PROJECT_DIR/build/DerivedData/Build/Products/Release/ReTypeR.app"
-log "Copying built app to dist/..."
-cp -R "$BUILT_APP" "$PROJECT_DIR/dist/"
-xattr -cr "$PROJECT_DIR/dist/ReTypeR.app"
-
-# Force register with LaunchServices and touch app bundle to notify Finder of icon change
-log "Force registering app bundle with LaunchServices to bypass cache..."
-touch "$PROJECT_DIR/dist/ReTypeR.app"
-touch "$PROJECT_DIR/dist/ReTypeR.app/Contents/Info.plist"
-touch "$PROJECT_DIR/dist/ReTypeR.app/Contents/Resources/AppIcon.icns"
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$PROJECT_DIR/dist/ReTypeR.app"
-
-# 6. Generate the DMG via dmgbuild with a new Volume Name to bypass Finder cache
-log "Running dmgbuild to generate ReTypeR.dmg..."
-dmgbuild -s "$PROJECT_DIR/dmg_settings.py" "ReTypeR Installer" "$PROJECT_DIR/ReTypeR.dmg"
-
-# 7. Apply the custom desktop icon to the DMG file itself
-log "Setting custom icon on the DMG file itself..."
-swift "$PROJECT_DIR/scripts/set_dmg_icon.swift"
-
-# 8. Relaunch Finder to force clear its internal icon display cache
-log "Relaunching Finder to force icon cache refresh..."
-killall Finder || true
-
-log "DMG generated successfully at: $PROJECT_DIR/ReTypeR.dmg"
+echo "==> Done: $DMG_PATH"
+ls -lh "$DMG_PATH"

@@ -49,13 +49,19 @@ class LayoutMapper {
     }
     
     func buildBidirectionalMap(layoutAID: String, layoutBID: String) {
-        guard let sourceA = availableLayouts.first(where: { getLayoutID(for: $0) == layoutAID }),
-              let sourceB = availableLayouts.first(where: { getLayoutID(for: $0) == layoutBID }) else {
+        if availableLayouts.isEmpty {
+            refreshAvailableLayouts()
+        }
+        
+        guard let sourceA = findLayout(for: layoutAID),
+              let sourceB = findLayout(for: layoutBID) else {
+            NSLog("[LayoutMapper] Failed to find layout sources for %@ or %@", layoutAID, layoutBID)
             return
         }
         
         guard let dataA = getKeyboardLayoutData(from: sourceA),
               let dataB = getKeyboardLayoutData(from: sourceB) else {
+            NSLog("[LayoutMapper] Failed to get keyboard layout data for %@ or %@", layoutAID, layoutBID)
             return
         }
         
@@ -98,6 +104,7 @@ class LayoutMapper {
         
         self.aToBMap = aToB
         self.bToAMap = bToA
+        NSLog("[LayoutMapper] Built bidirectional map with %d entries between %@ and %@", aToB.count, layoutAID, layoutBID)
     }
     
     // Auto-detection based on character frequencies
@@ -106,62 +113,51 @@ class LayoutMapper {
     }
     
     func convert(_ text: String, smart: Bool) -> String {
+        return convertDetailed(text, smart: smart).text
+    }
+    
+    /// Legacy signature preserved for compatibility (v1.3 §1.8):
+    /// hotkey path defaults to `.hotkey` source.
+    func convert(_ text: String, smart: Bool = true, source: ConversionSource) -> String {
+        return convertDetailed(text, smart: smart, source: source).text
+    }
+    
+    /// Full result adapter (v1.3 §1.8): exposes the scorer's decision so the
+    /// engine can switch layouts by OUTPUT dominance instead of counting input.
+    func convertDetailed(
+        _ text: String,
+        smart: Bool = true,
+        source: ConversionSource = .hotkey
+    ) -> ConversionResult {
+        if aToBMap.isEmpty || bToAMap.isEmpty {
+            PreferencesManager.shared.updateMapping()
+        }
+
         guard smart else {
-            return convertBasic(text)
+            let basic = convertBasic(text)
+            // Basic mode has no per-token analysis; report no dominant script.
+            return ConversionResult(text: basic, dominantSourceScript: nil, changed: basic != text)
         }
         
-        let countA = text.filter { aToBMap.keys.contains($0) }.count
-        let countB = text.filter { bToAMap.keys.contains($0) }.count
-        let convertAToB = countA >= countB
+        let langA = LayoutMapper.languageCode(for: PreferencesManager.shared.primaryLayoutID)
+        let langB = LayoutMapper.languageCode(for: PreferencesManager.shared.secondaryLayoutID)
         
-        let chunks = getChunks(text)
-        var result = ""
-        
-        let langA = languageCode(for: PreferencesManager.shared.primaryLayoutID)
-        let langB = languageCode(for: PreferencesManager.shared.secondaryLayoutID)
-        let spellChecker = NSSpellChecker.shared
-        
-        for chunk in chunks {
-            if !chunk.hasLetters {
-                result += chunk.text
-                continue
-            }
-            
-            let lettersOnly = String(chunk.text.filter { $0.isLetter })
-            
-            let isValidInA = isValidWord(lettersOnly, language: langA, spellChecker: spellChecker)
-            let isValidInB = isValidWord(lettersOnly, language: langB, spellChecker: spellChecker)
-            
-            let lettersConvertedToB = String(lettersOnly.map { aToBMap[$0] ?? $0 })
-            let lettersConvertedToA = String(lettersOnly.map { bToAMap[$0] ?? $0 })
-            
-            let isValidAsB = isValidWord(lettersConvertedToB, language: langB, spellChecker: spellChecker)
-            let isValidAsA = isValidWord(lettersConvertedToA, language: langA, spellChecker: spellChecker)
-            
-            let chunkConvertedToB = String(chunk.text.map { aToBMap[$0] ?? $0 })
-            let chunkConvertedToA = String(chunk.text.map { bToAMap[$0] ?? $0 })
-            
-            if isValidInA && !isValidInB {
-                result += chunk.text
-            } else if isValidInB && !isValidInA {
-                result += chunk.text
-            } else if isValidAsB && !isValidAsA {
-                result += chunkConvertedToB
-            } else if isValidAsA && !isValidAsB {
-                result += chunkConvertedToA
-            } else {
-                if convertAToB {
-                    result += chunkConvertedToB
-                } else {
-                    result += chunkConvertedToA
-                }
-            }
-        }
-        
-        return result
+        return SmartScorer.shared.convert(
+            text,
+            aToB: aToBMap,
+            bToA: bToAMap,
+            languageA: langA,
+            languageB: langB,
+            source: source,
+            tieBreakerAToB: { [weak self] in self?.tieBreakPrefersAToB() ?? false }
+        )
     }
     
     private func convertBasic(_ text: String) -> String {
+        if aToBMap.isEmpty || bToAMap.isEmpty {
+            PreferencesManager.shared.updateMapping()
+        }
+
         let countA = text.filter { aToBMap.keys.contains($0) }.count
         let countB = text.filter { bToAMap.keys.contains($0) }.count
         
@@ -187,116 +183,38 @@ class LayoutMapper {
         }
     }
     
-    private func languageCode(for layoutID: String) -> String {
+    /// A-07/MED-3: single source of truth for layout ID → language code.
+    /// Internal static so ConversionEngine resolves the same code the scorer
+    /// sees (de/fr/es included); the private duplicate in ConversionEngine
+    /// was removed.
+    static func languageCode(for layoutID: String) -> String {
         let lower = layoutID.lowercased()
-        if lower.contains("russian") || lower.contains("ru") { return "ru" }
-        if lower.contains("us") || lower.contains("english") || lower.contains("abc") || lower.contains("en") { return "en" }
-        if lower.contains("german") || lower.contains("de") { return "de" }
-        if lower.contains("french") || lower.contains("fr") { return "fr" }
-        if lower.contains("spanish") || lower.contains("es") { return "es" }
-        if lower.contains("ukrainian") || lower.contains("uk") { return "uk" }
+        // Full layout names first: short substrings must not shadow them
+        // («fr-EN-ch» contains "en", «r-USS-ian» contains "us").
+        if lower.contains("russian") { return "ru" }
+        if lower.contains("ukrainian") { return "uk" }
+        if lower.contains("german") { return "de" }
+        if lower.contains("french") { return "fr" }
+        if lower.contains("spanish") { return "es" }
+        if lower.contains("us") || lower.contains("english") || lower.contains("abc") { return "en" }
+        // Two-letter codes as a fallback for third-party layout IDs.
+        if lower.contains("ru") { return "ru" }
+        if lower.contains("uk") { return "uk" }
+        if lower.contains("de") { return "de" }
+        if lower.contains("fr") { return "fr" }
+        if lower.contains("es") { return "es" }
+        if lower.contains("en") { return "en" }
         return "en"
     }
     
-    private struct Chunk {
-        let text: String
-        let hasLetters: Bool
-    }
-    
-    private func getChunks(_ text: String) -> [Chunk] {
-        var chunks: [Chunk] = []
-        var currentChunk = ""
-        var currentHasLetters = false
-        
-        for char in text {
-            let isWhitespace = char.isWhitespace
-            let hasLetters = !isWhitespace
-            
-            if chunks.isEmpty {
-                currentChunk = String(char)
-                currentHasLetters = hasLetters
-                chunks.append(Chunk(text: "", hasLetters: false))
-                continue
-            }
-            
-            if isWhitespace == !currentHasLetters {
-                currentChunk.append(char)
-            } else {
-                chunks.append(Chunk(text: currentChunk, hasLetters: currentChunk.contains { $0.isLetter }))
-                currentChunk = String(char)
-                currentHasLetters = hasLetters
-            }
+    /// Tie-breaker for ambiguous conversions: use the active keyboard layout,
+    /// mirroring convertBasic behavior.
+    private func tieBreakPrefersAToB() -> Bool {
+        if let currentSource = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+           let currentID = getLayoutID(for: currentSource) {
+            return currentID == PreferencesManager.shared.primaryLayoutID
         }
-        if !currentChunk.isEmpty {
-            chunks.append(Chunk(text: currentChunk, hasLetters: currentChunk.contains { $0.isLetter }))
-        }
-        
-        return chunks.filter { !$0.text.isEmpty }
-    }
-    
-    private func isValidWord(_ word: String, language: String, spellChecker: NSSpellChecker) -> Bool {
-        if language == "ru" && !isCyrillic(word) {
-            return false
-        }
-        if language == "en" && !isLatin(word) {
-            return false
-        }
-        
-        // Russian words cannot start with soft sign (ь) or hard sign (ъ)
-        if language == "ru" {
-            if word.hasPrefix("ь") || word.hasPrefix("Ь") || word.hasPrefix("ъ") || word.hasPrefix("Ъ") {
-                return false
-            }
-        }
-        
-        let lower = word.lowercased()
-        
-        // Mock dict for headless tests where NSSpellChecker sandbox blocks IPC
-        let testWords: [String: Bool] = [
-            "hello": true,
-            "привет": true,
-            "проверим": true,
-            "email": true,
-            "my": true,
-            "тест": true,
-            "test": true
-        ]
-        if let isTestWord = testWords[lower] {
-            return isTestWord
-        }
-        
-        // Detect if NSSpellChecker is blocked/failing in sandbox (returns NSNotFound for gibberish)
-        let sandboxRange = spellChecker.checkSpelling(of: "xxyyzzqquu", startingAt: 0)
-        let isFailing = (sandboxRange.location == NSNotFound)
-        if isFailing {
-            return false
-        }
-        
-        if word.count <= 1 {
-            if language == "ru" {
-                return "вияуосябж".contains(lower)
-            } else if language == "en" {
-                return "ai".contains(lower)
-            }
-            return true
-        }
-        
-        let range = spellChecker.checkSpelling(of: word, startingAt: 0, language: language, wrap: false, inSpellDocumentWithTag: 0, wordCount: nil)
-        return range.location == NSNotFound
-    }
-    
-    private func isCyrillic(_ text: String) -> Bool {
-        return text.contains { char in
-            guard let scalar = char.unicodeScalars.first else { return false }
-            return (scalar.value >= 0x0400 && scalar.value <= 0x04FF)
-        }
-    }
-    
-    private func isLatin(_ text: String) -> Bool {
-        return text.contains { char in
-            let lower = char.lowercased()
-            return lower >= "a" && lower <= "z"
-        }
+        return false
     }
     
     func switchToLayout(id: String) {
@@ -311,6 +229,30 @@ class LayoutMapper {
     }
     
     // MARK: - Private Helpers
+    
+    private func findLayout(for id: String) -> TISInputSource? {
+        if let exact = availableLayouts.first(where: { getLayoutID(for: $0) == id }) {
+            return exact
+        }
+        let lower = id.lowercased()
+        if lower.contains("us") || lower.contains("abc") || lower.contains("en") {
+            if let match = availableLayouts.first(where: {
+                guard let sid = getLayoutID(for: $0)?.lowercased() else { return false }
+                return sid.contains("abc") || sid.contains("us") || sid.contains("en")
+            }) {
+                return match
+            }
+        }
+        if lower.contains("russian") || lower.contains("ru") {
+            if let match = availableLayouts.first(where: {
+                guard let sid = getLayoutID(for: $0)?.lowercased() else { return false }
+                return sid.contains("russian") || sid.contains("ru")
+            }) {
+                return match
+            }
+        }
+        return nil
+    }
     
     private func getLayoutID(for source: TISInputSource) -> String? {
         guard let idPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return nil }

@@ -1,418 +1,595 @@
 import SwiftUI
+import AppKit
 import KeyboardShortcuts
 
 struct SettingsView: View {
     @ObservedObject var prefs = PreferencesManager.shared
     @ObservedObject var launch = LaunchManager.shared
     @ObservedObject var stats = StatisticsManager.shared
-    
+    @ObservedObject var permissions = PermissionsManager.shared
+
     @State private var installedLayouts: [KeyboardLayoutInfo] = []
     @State private var isHistoryExpanded = false
-    
+    @State private var isClearLogConfirmationShown = false
+    @State private var isResetStatsConfirmationShown = false
+    @State private var copiedIndex: Int?
+
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Header (About App with Logo)
-                    HStack(spacing: 16) {
-                        if let nsImage = NSImage(named: "AppIcon") ?? NSImage(contentsOfFile: Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "") {
-                            Image(nsImage: nsImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 56, height: 56)
-                                .cornerRadius(12)
-                                .shadow(color: Color.accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
-                        } else {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.accentColor)
-                                    .frame(width: 56, height: 56)
-                                Image(systemName: "keyboard")
-                                    .font(.title)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("ReTypeR")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                            Text("Версия \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.2")")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        // Social Links
-                        HStack(spacing: 12) {
-                            Link(destination: URL(string: "https://t.me/your_telegram_channel")!) {
-                                VStack(spacing: 4) {
-                                    Image("telegram")
-                                        .renderingMode(.template)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: 24, height: 24)
-                                        .foregroundColor(Color(red: 38/255, green: 165/255, blue: 228/255))
-                                    Text("Telegram")
-                                        .font(.system(size: 9))
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            
-                            Link(destination: URL(string: "https://github.com/your_github_repo")!) {
-                                VStack(spacing: 4) {
-                                    Image("github")
-                                        .renderingMode(.template)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: 24, height: 24)
-                                        .foregroundColor(.primary) // white in dark mode, black in light mode
-                                    Text("GitHub")
-                                        .font(.system(size: 9))
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Header (App identity + links)
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(LinearGradient.brandRed)
+                            .frame(width: 44, height: 44)
+                            .shadow(color: Color.brandAccent.opacity(0.3), radius: 6, x: 0, y: 3)
+                        Image(systemName: "keyboard")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
                     }
-                    .padding(.horizontal, 4)
-                    
-                    Divider()
-                    
-                    // Section 1: Hotkeys
-                    VStack(alignment: .leading, spacing: 8) {
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("ReTypeR")
+                            .font(.system(size: 18, weight: .bold))
+                        Text("Умная смена раскладки клавиатуры • Версия \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3")")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        Link(destination: URL(string: "https://t.me/retyper_app") ?? URL(string: "https://telegram.org")!) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color(red: 0.2, green: 0.65, blue: 0.95))
+                                Text("Telegram")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.06))
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+
+                        Link(destination: URL(string: "https://github.com")!) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "curlybraces")
+                                    .font(.system(size: 11))
+                                Text("GitHub")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.06))
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                // Section 0: System Permissions Alert (SingAR amber card)
+                if !permissions.isAccessibilityGranted {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(Color.brandAmber)
+                            Text("Требуются системные разрешения macOS")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.primary)
+                        }
+
+                        VStack(spacing: 8) {
+                            permissionRow(
+                                title: "Универсальный доступ (чтение и замена текста)",
+                                isGranted: permissions.isAccessibilityGranted,
+                                icon: "accessibility",
+                                onRequest: { permissions.requestAccessibility() },
+                                onOpenSettings: { permissions.openAccessibilitySettings() }
+                            )
+                        }
+                        .padding(12)
+                        .background(Color.brandCard)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.brandAmber.opacity(0.4), lineWidth: 1)
+                        )
+                    }
+                }
+
+                // Section 1: Hotkeys & Shortcuts
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "keyboard")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color.brandAccent)
                         Text("Горячие клавиши")
-                            .font(.headline)
-                            .foregroundColor(.accentColor)
-                        
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("Сочетание для конвертации:")
-                                .font(.body) // Unified font size
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Сочетание для конвертации:")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("Конвертирует выделенный текст между раскладками")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                            }
                             Spacer()
                             KeyboardShortcuts.Recorder(for: .convertText)
                         }
-                        .padding(12)
-                        .background(Color.primary.opacity(0.02))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-                        )
                     }
-                    
-                    // Section 2: Layouts
-                    VStack(alignment: .leading, spacing: 8) {
+                    .padding(14)
+                    .background(Color.brandCard)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.brandBorder, lineWidth: 1)
+                    )
+                }
+
+                // Section 2: Keyboard Layouts
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "globe")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color.brandAccent)
                         Text("Раскладки клавиатуры")
-                            .font(.headline)
-                            .foregroundColor(.accentColor)
-                        
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text("Основная раскладка (A):")
-                                    .font(.body) // Unified font size
-                                Spacer()
-                                Picker("", selection: $prefs.primaryLayoutID) {
-                                    if installedLayouts.isEmpty {
-                                        Text("Загрузка...").tag(prefs.primaryLayoutID)
-                                    } else {
-                                        ForEach(installedLayouts) { layout in
-                                            Text(layout.localizedName).tag(layout.id)
-                                        }
-                                    }
-                                }
-                                .labelsHidden()
-                                .fixedSize()
-                            }
-                            .onChange(of: prefs.primaryLayoutID) { _, _ in
-                                prefs.updateMapping()
-                            }
-                            
-                            HStack {
-                                Text("Вторичная раскладка (B):")
-                                    .font(.body) // Unified font size
-                                Spacer()
-                                Picker("", selection: $prefs.secondaryLayoutID) {
-                                    if installedLayouts.isEmpty {
-                                        Text("Загрузка...").tag(prefs.secondaryLayoutID)
-                                    } else {
-                                        ForEach(installedLayouts) { layout in
-                                            Text(layout.localizedName).tag(layout.id)
-                                        }
-                                    }
-                                }
-                                .labelsHidden()
-                                .fixedSize()
-                            }
-                            .onChange(of: prefs.secondaryLayoutID) { _, _ in
-                                prefs.updateMapping()
-                            }
-                        }
-                        .padding(12)
-                        .background(Color.primary.opacity(0.02))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-                        )
-                    }
-                    
-                    // Section 3: System & Notifications
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Система и Уведомления")
-                            .font(.headline)
-                            .foregroundColor(.accentColor)
-                        
-                        VStack(alignment: .leading, spacing: 12) {
-                            Toggle("Запуск при старте системы", isOn: Binding(
-                                get: { launch.isLaunchAtLoginEnabled },
-                                set: { launch.setLaunchAtLogin($0) }
-                            ))
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Toggle("Умное распознавание раскладки", isOn: $prefs.isSmartRecognitionEnabled)
-                                Text("Конвертирует только слова с опечатками раскладки, оставляя правильный текст без изменений.")
-                                    .font(.caption)
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("По умолчанию Русская")
+                                    .font(.system(size: 10))
                                     .foregroundColor(.secondary)
-                                    .padding(.leading, 18)
                             }
-                            
-                            Toggle("Показывать уведомления (Toast)", isOn: $prefs.isToastEnabled)
-                            
-                            Toggle("Выделять весь текст (Cmd+A) перед конвертацией", isOn: $prefs.autoSelectAllText)
-                            
-                            Toggle("Переключать язык системы после конвертации", isOn: $prefs.switchLayoutAfterConversion)
-                            
-                            Toggle("Сохранять историю конвертаций", isOn: $prefs.isHistoryEnabled)
+                            Spacer()
+                            Picker("", selection: $prefs.primaryLayoutID) {
+                                if installedLayouts.isEmpty {
+                                    Text("Загрузка...").tag(prefs.primaryLayoutID)
+                                } else {
+                                    ForEach(installedLayouts) { layout in
+                                        Text(layout.localizedName).tag(layout.id)
+                                    }
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
                         }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.primary.opacity(0.02))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-                        )
-                    }
-                    
-                    // Section 4: Statistics & History
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Статистика и История")
-                            .font(.headline)
-                            .foregroundColor(.accentColor)
-                        
-                        VStack(alignment: .leading, spacing: 12) {
-                            // 2x2 grid for stats and action buttons
-                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                                // Cell 1: Conversions
-                                VStack(spacing: 4) {
-                                    Image(systemName: "arrow.left.arrow.right.circle")
-                                        .font(.title3)
-                                        .foregroundColor(.accentColor)
-                                    Text("Конвертации")
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
-                                    Text("\(stats.totalConversions)")
-                                        .font(.body)
-                                        .fontWeight(.bold)
-                                }
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.primary.opacity(0.03))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.primary.opacity(0.02), lineWidth: 1)
-                                )
-                                
-                                // Cell 2: Characters
-                                VStack(spacing: 4) {
-                                    Image(systemName: "character.textbox")
-                                        .font(.title3)
-                                        .foregroundColor(.accentColor)
-                                    Text("Символы")
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
-                                    Text("\(stats.totalCharactersConverted)")
-                                        .font(.body)
-                                        .fontWeight(.bold)
-                                }
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.primary.opacity(0.03))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.primary.opacity(0.02), lineWidth: 1)
-                                )
-                                
-                                // Cell 3: History Toggle Button
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        isHistoryExpanded.toggle()
-                                    }
-                                }) {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "clock.arrow.circlepath")
-                                            .font(.title3)
-                                            .foregroundColor(isHistoryExpanded ? .accentColor : .secondary)
-                                        Text("История")
-                                            .font(.body)
-                                            .foregroundColor(.primary)
-                                            .multilineTextAlignment(.center)
-                                        Text(isHistoryExpanded ? "Скрыть" : "Показать")
-                                            .font(.system(size: 9))
-                                            .foregroundColor(.secondary)
-                                            .multilineTextAlignment(.center)
-                                    }
-                                    .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .background(Color.primary.opacity(isHistoryExpanded ? 0.08 : 0.03))
-                                    .cornerRadius(8)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(isHistoryExpanded ? Color.accentColor.opacity(0.3) : Color.primary.opacity(0.02), lineWidth: 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                
-                                // Cell 4: Reset Button
-                                Button(action: {
-                                    confirmReset()
-                                }) {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "trash")
-                                            .font(.title3)
-                                            .foregroundColor(.red)
-                                        Text("Сбросить")
-                                            .font(.body)
-                                            .foregroundColor(.red)
-                                            .multilineTextAlignment(.center)
-                                        Text(" ") // Spacer to keep heights equal
-                                            .font(.system(size: 9))
-                                    }
-                                    .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .background(Color.red.opacity(0.06))
-                                    .cornerRadius(8)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color.red.opacity(0.15), lineWidth: 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(stats.totalConversions == 0 && stats.totalCharactersConverted == 0)
+                        .onChange(of: prefs.primaryLayoutID) { _, _ in
+                            prefs.updateMapping()
+                        }
+
+                        Divider()
+
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Вторичная раскладка (B):")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("По умолчанию English")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
                             }
-                            
-                            if isHistoryExpanded {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("История последних запросов:")
-                                        .font(.body)
-                                        .fontWeight(.semibold)
+                            Spacer()
+                            Picker("", selection: $prefs.secondaryLayoutID) {
+                                if installedLayouts.isEmpty {
+                                    Text("Загрузка...").tag(prefs.secondaryLayoutID)
+                                } else {
+                                    ForEach(installedLayouts) { layout in
+                                        Text(layout.localizedName).tag(layout.id)
+                                    }
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                        .onChange(of: prefs.secondaryLayoutID) { _, _ in
+                            prefs.updateMapping()
+                        }
+
+                        if prefs.primaryLayoutID == prefs.secondaryLayoutID, !installedLayouts.isEmpty {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.system(size: 11))
+                                Text("Основная и вторичная раскладки совпадают — выберите разные раскладки.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(.top, 2)
+                        }
+                    }
+                    .padding(14)
+                    .background(Color.brandCard)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.brandBorder, lineWidth: 1)
+                    )
+                }
+
+                // Section 3: Conversion & System Parameters
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color.brandAccent)
+                        Text("Параметры конвертации и системы")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Toggle("Умное распознавание раскладки", isOn: $prefs.isSmartRecognitionEnabled)
+                                .toggleStyle(.checkbox)
+                                .font(.system(size: 12))
+                            Text("Конвертирует только слова с опечатками раскладки на основе частотного словаря, сохраняя правильные слова.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                                .padding(.leading, 18)
+                        }
+
+                        Divider()
+
+                        Toggle("Запускать ReTypeR при входе в систему", isOn: Binding(
+                            get: { launch.isLaunchAtLoginEnabled },
+                            set: { launch.setLaunchAtLogin($0) }
+                        ))
+                        .toggleStyle(.checkbox)
+                        .font(.system(size: 12))
+
+                        Divider()
+
+                        Toggle("Показывать всплывающие уведомления (Toast)", isOn: $prefs.isToastEnabled)
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 12))
+
+                        Divider()
+
+                        Toggle("Выделять весь текст (⌘A) перед конвертацией", isOn: $prefs.autoSelectAllText)
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 12))
+
+                        Divider()
+
+                        Toggle("Переключать раскладку системы после конвертации", isOn: $prefs.switchLayoutAfterConversion)
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 12))
+
+                        Divider()
+
+                        Toggle("Сохранять историю последних конвертаций", isOn: $prefs.isHistoryEnabled)
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 12))
+                    }
+                    .padding(14)
+                    .background(Color.brandCard)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.brandBorder, lineWidth: 1)
+                    )
+                }
+
+                // Section 4: Statistics & History
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "chart.bar")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color.brandAccent)
+                        Text("Статистика и История")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        // 3-Metric Tile Row (SingAR style)
+                        HStack(spacing: 8) {
+                            metricTile(title: "Конвертации", value: "\(stats.totalConversions)", icon: "arrow.left.arrow.right.circle")
+                            metricTile(title: "Символы", value: "\(stats.totalCharactersConverted)", icon: "character.textbox")
+                            metricTile(title: "Записей", value: "\(stats.history.count)", icon: "clock.arrow.circlepath")
+                        }
+
+                        Divider()
+
+                        // Action Buttons: History Toggle / Data Folder / Reset
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.22)) {
+                                    isHistoryExpanded.toggle()
+                                }
+                            }) {
+                                Label(isHistoryExpanded ? "Скрыть историю" : "Показать историю", systemImage: "clock.arrow.circlepath")
+                                    .font(.system(size: 11))
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button(action: {
+                                let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+                                let dir = appSupport.appendingPathComponent("ReTypeR")
+                                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                                NSWorkspace.shared.open(dir)
+                            }) {
+                                Label("Папка данных", systemImage: "folder")
+                                    .font(.system(size: 11))
+                            }
+                            .buttonStyle(.bordered)
+
+                            Spacer()
+
+                            Button(action: {
+                                isResetStatsConfirmationShown = true
+                            }) {
+                                Label("Сбросить", systemImage: "trash")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(stats.totalConversions == 0 && stats.totalCharactersConverted == 0)
+                        }
+
+                        // Collapsible History view inside Settings
+                        if isHistoryExpanded {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("История последних конвертаций:")
+                                        .font(.system(size: 11, weight: .semibold))
                                         .foregroundColor(.secondary)
-                                    
-                                    if !prefs.isHistoryEnabled {
-                                        Text("История отключена в настройках")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .italic()
-                                            .frame(maxWidth: .infinity, alignment: .center)
-                                            .padding(.vertical, 12)
-                                    } else if stats.history.isEmpty {
-                                        Text("История пуста")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .italic()
-                                            .frame(maxWidth: .infinity, alignment: .center)
-                                            .padding(.vertical, 12)
-                                    } else {
-                                        ScrollView {
-                                            VStack(spacing: 6) {
-                                                ForEach(stats.history) { record in
-                                                    HStack {
-                                                        VStack(alignment: .leading, spacing: 2) {
-                                                            Text(record.original)
-                                                                .font(.system(size: 10))
+                                    Spacer()
+                                    Text("Нажмите для копирования")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.secondary.opacity(0.7))
+                                }
+
+                                if !prefs.isHistoryEnabled {
+                                    Text("История отключена в настройках")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding(.vertical, 12)
+                                } else if stats.history.isEmpty {
+                                    Text("История пуста")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding(.vertical, 12)
+                                } else {
+                                    ScrollView {
+                                        VStack(spacing: 5) {
+                                            ForEach(Array(stats.history.enumerated()), id: \.element.id) { index, record in
+                                                Button {
+                                                    copyToClipboard(record.converted, at: index)
+                                                } label: {
+                                                    VStack(alignment: .leading, spacing: 2) {
+                                                        HStack {
+                                                            Text(formatTime(record.timestamp))
+                                                                .font(.system(size: 9))
                                                                 .foregroundColor(.secondary)
-                                                                .lineLimit(1)
-                                                            Text(record.converted)
-                                                                .font(.system(size: 11, weight: .semibold))
-                                                                .foregroundColor(.primary)
-                                                                .lineLimit(1)
+                                                            Spacer()
+                                                            if copiedIndex == index {
+                                                                Text("Скопировано!")
+                                                                    .font(.system(size: 9, weight: .bold))
+                                                                    .foregroundColor(Color.brandGreen)
+                                                            } else {
+                                                                Text(record.original)
+                                                                    .font(.system(size: 9))
+                                                                    .foregroundColor(.secondary.opacity(0.6))
+                                                                    .lineLimit(1)
+                                                            }
                                                         }
-                                                        Spacer()
-                                                        Text(formatTime(record.timestamp))
-                                                            .font(.system(size: 8))
-                                                            .foregroundColor(.secondary.opacity(0.6))
+
+                                                        Text(record.converted)
+                                                            .font(.system(size: 11))
+                                                            .foregroundColor(.primary)
+                                                            .lineLimit(2)
+                                                            .multilineTextAlignment(.leading)
                                                     }
                                                     .padding(6)
                                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                                    .background(Color.primary.opacity(0.02))
+                                                    .background(copiedIndex == index ? Color.brandGreen.opacity(0.12) : Color.brandCard)
                                                     .cornerRadius(6)
                                                 }
+                                                .buttonStyle(.plain)
                                             }
                                         }
-                                        .frame(maxHeight: 150)
+                                        .padding(.vertical, 2)
                                     }
+                                    .frame(minHeight: 100, maxHeight: 180)
                                 }
-                                .padding(.top, 4)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
+                            .padding(.top, 4)
+                            .transition(.opacity)
                         }
-                        .padding(12)
-                        .background(Color.primary.opacity(0.02))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-                        )
                     }
-                    
-                    // Bottom Anchor for ScrollViewReader
-                    Color.clear
-                        .frame(height: 1)
-                        .id("bottom_anchor")
+                    .padding(14)
+                    .background(Color.brandCard)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.brandBorder, lineWidth: 1)
+                    )
                 }
-                .padding(16)
-            }
-            .frame(width: 440, height: 500)
-            .onAppear {
-                LayoutMapper.shared.refreshAvailableLayouts()
-                self.installedLayouts = LayoutMapper.shared.getInstalledLayouts()
-            }
-            .onChange(of: isHistoryExpanded) { _, newValue in
-                if newValue {
-                    // Let SwiftUI rendering complete before scrolling
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo("bottom_anchor", anchor: .bottom)
+
+                // Section 5: Privacy & Diagnostics
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "lock.shield")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color.brandAccent)
+                        Text("Приватность и Журнал")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Toggle("Вести журнал конвертаций", isOn: $prefs.isConversionLogEnabled)
+                                .toggleStyle(.checkbox)
+                                .font(.system(size: 12))
+                            Text("Журнал хранится локально в ~/Library/Application Support/ReTypeR/conversion_log.jsonl. Выключен по умолчанию.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                                .padding(.leading, 18)
+                        }
+
+                        HStack {
+                            Button(action: {
+                                isClearLogConfirmationShown = true
+                            }) {
+                                Label("Очистить журнал", systemImage: "trash")
+                                    .font(.system(size: 11))
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button(action: {
+                                let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+                                    .appendingPathComponent("ReTypeR/conversion_log.jsonl")
+                                if FileManager.default.fileExists(atPath: url.path) {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }) {
+                                Label("Открыть conversion_log.jsonl", systemImage: "doc.text")
+                                    .font(.system(size: 11))
+                            }
+                            .buttonStyle(.bordered)
                         }
                     }
+                    .padding(14)
+                    .background(Color.brandCard)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.brandBorder, lineWidth: 1)
+                    )
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+        }
+        .frame(minWidth: 540, minHeight: 620)
+        .confirmationDialog(
+            "Очистить журнал конвертаций?",
+            isPresented: $isClearLogConfirmationShown,
+            titleVisibility: .visible
+        ) {
+            Button("Очистить журнал", role: .destructive) {
+                ConversionLogger.shared.clearLog()
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Файл журнала conversion_log.jsonl будет удалён без возможности восстановления.")
+        }
+        .confirmationDialog(
+            "Сброс статистики и истории?",
+            isPresented: $isResetStatsConfirmationShown,
+            titleVisibility: .visible
+        ) {
+            Button("Сбросить", role: .destructive) {
+                stats.reset()
+                isHistoryExpanded = false
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Вы действительно хотите очистить историю конвертаций и счётчики символов?")
+        }
+        .onAppear {
+            LayoutMapper.shared.refreshAvailableLayouts()
+            installedLayouts = LayoutMapper.shared.getInstalledLayouts()
+            permissions.checkAccessibility()
+        }
+    }
+
+    // MARK: - Components
+
+    private func metricTile(title: String, value: String, icon: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(Color.brandAccent)
+            Text(title)
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(.primary)
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(Color.primary.opacity(0.03))
+        .cornerRadius(8)
+    }
+
+    private func permissionRow(
+        title: String,
+        isGranted: Bool,
+        icon: String,
+        onRequest: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(isGranted ? Color.brandGreen : Color.brandAmber)
+                .frame(width: 20)
+
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            if isGranted {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(Color.brandGreen)
+                    Text("Разрешено")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color.brandGreen)
+                }
+            } else {
+                HStack(spacing: 6) {
+                    Button("Разрешить") {
+                        onRequest()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.brandAccent)
+                    .controlSize(.small)
+
+                    Button("Настройки macOS") {
+                        onOpenSettings()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
         }
     }
-    
-    private func confirmReset() {
-        let alert = NSAlert()
-        alert.messageText = "Сброс статистики"
-        alert.informativeText = "Вы действительно хотите очистить историю и статистику?"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Сбросить")
-        alert.addButton(withTitle: "Отмена")
-        
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            stats.reset()
-            isHistoryExpanded = false
+
+    private func copyToClipboard(_ text: String, at index: Int) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        withAnimation {
+            copiedIndex = index
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if copiedIndex == index {
+                withAnimation {
+                    copiedIndex = nil
+                }
+            }
         }
     }
-    
+
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
-        formatter.dateStyle = .none
         return formatter.string(from: date)
     }
 }

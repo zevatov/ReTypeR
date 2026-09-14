@@ -2,25 +2,40 @@ import Cocoa
 import Combine
 import SwiftUI
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
+    private var eventMonitor: Any?
+    private var statusTimer: Timer?
     
     var statusItem: NSStatusItem!
-    var popover: NSPopover!
+    private var popover: NSPopover?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Run as accessory app (menu-bar only, no Dock icon)
+        NSApp.setActivationPolicy(.accessory)
+
+        // Build initial keyboard layout mapping
+        PreferencesManager.shared.updateMapping()
+        
+        // Setup status item in system menu bar
+        setupStatusItem()
+        
         // Check Accessibility permission on startup
         PermissionsManager.shared.checkAccessibility()
         
         // If not granted, present the Onboarding View to guide the user
         if !PermissionsManager.shared.isAccessibilityGranted {
-            DispatchQueue.main.async {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 WindowManager.shared.showOnboarding()
             }
+        } else {
+            // Show brief welcoming toast so user immediately sees that ReTypeR has launched in the menu bar
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.3"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                WindowManager.shared.showInfoToast(message: "ReTypeR \(version) запущен в строке меню")
+            }
         }
-        
-        // Setup status item manually for left/right click distinction
-        setupStatusItem()
         
         // Setup hotkey listener when accessibility permission is granted
         PermissionsManager.shared.$isAccessibilityGranted
@@ -40,14 +55,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
             
-        // Reactively update menu bar status icon on settings changes
-        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.updateStatusIcon()
-            }
-            .store(in: &cancellables)
-            
         // Reactively update menu bar status icon on permission changes
         PermissionsManager.shared.$isAccessibilityGranted
             .receive(on: DispatchQueue.main)
@@ -55,21 +62,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateStatusIcon()
             }
             .store(in: &cancellables)
+
+        // Periodic heartbeat to refresh icon and detect permission/theme changes (identical to SingAR)
+        statusTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateStatusIcon()
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        togglePopover()
+        return true
+    }
+
+    deinit {
+        statusTimer?.invalidate()
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
+        }
     }
     
     func setupStatusItem() {
+        // Clean up stale position artifacts from old releases
+        UserDefaults.standard.removeObject(forKey: "NSStatusItem Preferred Position ReTypeRStatusItem")
+        UserDefaults.standard.removeObject(forKey: "NSStatusItem Path ReTypeRStatusItem")
+        UserDefaults.standard.removeObject(forKey: "NSStatusItem Preferred Position ReTypeR")
+
+        // Guarantee placement in safe third-party status bar area (to the left of system Clock/Control Center)
+        let prefKey = "NSStatusItem Preferred Position Item-0"
+        let currentPos = UserDefaults.standard.double(forKey: prefKey)
+        // System items (Clock, Control Center, Battery, WiFi) take up the rightmost ~380pt.
+        // Positions < 400 collide with the Clock; positions > 1800 are stale absolute coordinates from multi-monitor setups.
+        if currentPos < 400 || currentPos > 1800 {
+            UserDefaults.standard.set(620.0, forKey: prefKey)
+            UserDefaults.standard.synchronize()
+        }
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.isVisible = true
         if let button = statusItem.button {
-            button.action = #selector(statusItemClicked(_:))
             button.target = self
+            button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-        
-        popover = NSPopover()
-        // Allow popover size to adapt or be fixed
-        popover.contentSize = NSSize(width: 250, height: 420)
-        popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: MenuBarView())
         
         updateStatusIcon()
     }
@@ -84,11 +118,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func togglePopover() {
-        if popover.isShown {
-            popover.performClose(nil)
+        if let popover, popover.isShown {
+            closePopover()
         } else if let button = statusItem.button {
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            showPopover(button)
+        }
+    }
+
+    func showPopover(_ sender: NSStatusBarButton) {
+        closePopover()
+
+        let pop = NSPopover()
+        // SingAR compact width: 290pt
+        pop.contentSize = NSSize(width: 290, height: 380)
+        pop.behavior = .transient
+        pop.animates = true
+        pop.contentViewController = NSHostingController(rootView: MenuBarView())
+        self.popover = pop
+
+        NSApp.activate(ignoringOtherApps: true)
+        pop.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+        sender.window?.makeKey()
+
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.closePopover()
+        }
+    }
+
+    func closePopover() {
+        popover?.performClose(nil)
+        popover = nil
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
+            self.eventMonitor = nil
         }
     }
     
@@ -124,7 +186,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func confirmExit() {
         let alert = NSAlert()
         alert.messageText = "Выход"
-        alert.informativeText = "Вы действительно хотите выйти из приложения?"
+        alert.informativeText = "Вы действительно хотите выйти из ReTypeR?"
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Выйти")
         alert.addButton(withTitle: "Отмена")
@@ -136,79 +198,66 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func updateStatusIcon() {
-        guard let button = statusItem?.button else { return }
-        
-        let isEnabled = PreferencesManager.shared.isAppEnabled
-        let isGranted = PermissionsManager.shared.isAccessibilityGranted
-        
-        let statusColor: NSColor
-        if !isEnabled {
-            statusColor = .systemRed
-        } else if !isGranted {
-            statusColor = .systemOrange
-        } else {
-            statusColor = .systemGreen
-        }
-        
-        let baseImage = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "ReTypeR") ?? NSImage()
-        let tintedKeyboard = baseImage.tinted(with: .white)
-        let size = NSSize(width: 22, height: 18)
-        let compositeImage = NSImage(size: size, flipped: false) { rect in
-            let keyboardSize = NSSize(width: 17, height: 11)
-            let keyboardRect = NSRect(
-                x: 0,
-                y: (rect.height - keyboardSize.height) / 2,
-                width: keyboardSize.width,
-                height: keyboardSize.height
-            )
-            tintedKeyboard.draw(in: keyboardRect)
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let button = self.statusItem?.button else { return }
             
-            // Draw the status dot in the bottom right corner with a tiny gap
-            let dotRadius: CGFloat = 2.5
-            let dotRect = NSRect(
-                x: rect.width - dotRadius * 2,
-                y: 1,
-                width: dotRadius * 2,
-                height: dotRadius * 2
-            )
+            let isEnabled = PreferencesManager.shared.isAppEnabled
+            let isGranted = PermissionsManager.shared.isAccessibilityGranted
             
-            // Draw a stroke/background under the dot for high contrast in all themes
-            let strokePath = NSBezierPath(ovalIn: dotRect.insetBy(dx: -0.75, dy: -0.75))
-            NSColor.windowBackgroundColor.set()
-            strokePath.fill()
+            // 1. Determine Status Dot Color
+            let dotColor: NSColor
+            if !isEnabled {
+                dotColor = .systemRed       // 🔴 Paused
+            } else if !isGranted {
+                dotColor = .systemOrange    // 🟡 Missing permissions
+            } else {
+                dotColor = .systemGreen     // 🟢 Active & Ready
+            }
             
-            let path = NSBezierPath(ovalIn: dotRect)
-            statusColor.set()
-            path.fill()
-            
-            return true
-        }
-        
-        compositeImage.isTemplate = false
-        button.image = compositeImage
-    }
-}
+            // 2. Keyboard Glyph Styling with dynamic dark/light appearance resolution
+            let isDark = (UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark")
+                || (button.window?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+                || (NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+            let baseColor: NSColor = isDark ? .white : NSColor(white: 0.1, alpha: 1.0)
+            let activeColor = isEnabled ? baseColor : NSColor(white: 0.5, alpha: 1.0)
 
-extension NSImage {
-    func tinted(with color: NSColor) -> NSImage {
-        guard let representation = bestRepresentation(for: NSRect(origin: .zero, size: size), context: nil, hints: nil) else {
-            return self
+            let symbolName = "keyboard"
+            let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+            let colorConfig = NSImage.SymbolConfiguration(paletteColors: [activeColor])
+            let finalConfig = config.applying(colorConfig)
+
+            guard let glyph = NSImage(systemSymbolName: symbolName, accessibilityDescription: "ReTypeR")?
+                .withSymbolConfiguration(finalConfig) else { return }
+
+            let totalWidth: CGFloat = 28
+            let totalHeight: CGFloat = 18
+
+            let combinedImage = NSImage(size: NSSize(width: totalWidth, height: totalHeight), flipped: false) { rect in
+                let glyphRect = NSRect(
+                    x: 0,
+                    y: (totalHeight - glyph.size.height) / 2,
+                    width: glyph.size.width,
+                    height: glyph.size.height
+                )
+                glyph.draw(in: glyphRect)
+
+                // Draw Status Circle Dot on the right (🟢/🟡/🔴)
+                let dotSize: CGFloat = 6.0
+                let dotRect = NSRect(
+                    x: totalWidth - dotSize - 1,
+                    y: (totalHeight - dotSize) / 2,
+                    width: dotSize,
+                    height: dotSize
+                )
+                let path = NSBezierPath(ovalIn: dotRect)
+                dotColor.setFill()
+                path.fill()
+
+                return true
+            }
+            
+            button.image = combinedImage
+            button.toolTip = isEnabled ? (isGranted ? "ReTypeR: Работает" : "ReTypeR: Требуются разрешения") : "ReTypeR: На паузе"
         }
-        let tintedImage = NSImage(size: size)
-        tintedImage.isTemplate = false
-        tintedImage.addRepresentation(NSCustomImageRep(size: size, flipped: false) { rect in
-            guard let context = NSGraphicsContext.current?.cgContext else { return false }
-            context.saveGState()
-            
-            representation.draw(in: rect)
-            
-            context.setBlendMode(.sourceIn)
-            color.set()
-            rect.fill()
-            
-            context.restoreGState()
-            return true
-        })
-        return tintedImage
     }
 }

@@ -3,37 +3,106 @@ options:
   bundleIdPrefix: com.retyper
   deploymentTarget:
     macOS: "15.0"
+  createIntermediateGroups: true
+
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    exactVersion: 2.4.0
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.3.3"
+    CURRENT_PROJECT_VERSION: "4"
+    # Real Apple Development identity (stable Team ID): amfid on current
+    # macOS rejects ad-hoc signatures at launch ("The file is adhoc signed
+    # or signed by an unknown certificate chain"), so Development-identity
+    # signing is now REQUIRED for the app to run at all. Bonus: a stable
+    # identity means TCC permissions granted once survive rebuilds.
+    # Exact common name + Manual style: automatic signing looks for the
+    # legacy "Mac Development" type and mismatches the certificate's OU.
+    CODE_SIGN_IDENTITY: "Apple Development: fon2019@mail.ru (VWP6HX9984)"
+    CODE_SIGN_STYLE: "Manual"
+    # Xcode 26 builds the app as a thin stub + ReTypeR.debug.dylib in Debug;
+    # the xctest bundle then links @rpath/ReTypeR.debug.dylib and Launch
+    # Services cannot resolve it ("Could not launch ReTypeRTests"). Build a
+    # classic monolithic binary instead.
+    ENABLE_DEBUG_DYLIB: "NO"
+    ENABLE_PREVIEWS: "NO"
+  configs:
+    Debug:
+      ENABLE_HARDENED_RUNTIME: "NO"
+    Release:
+      ENABLE_HARDENED_RUNTIME: "YES"
+
 targets:
   ReTypeR:
     type: application
     platform: macOS
-    bundleId: com.retyper.app
     sources:
       - path: Sources
-    info:
-      path: Info.plist
-      properties:
-        LSUIElement: true
-        CFBundleIconFile: AppIcon.icns
-        NSAccessibilityUsageDescription: "ReTypeR нуждается в доступе к функциям Универсального доступа (Accessibility) для чтения выделенного текста и эмуляции нажатий клавиш."
+    resources:
+      - path: Sources/App/Assets.xcassets
+      - path: Sources/Resources/frequency_ru.txt
+      - path: Sources/Resources/frequency_en.txt
+      - path: Sources/Resources/bigram_ru.bin
+      - path: Sources/Resources/bigram_en.bin
+      - path: Sources/Resources/FREQUENCY_DATA_LICENSE.md
     dependencies:
       - package: KeyboardShortcuts
+    info:
+      path: Sources/App/Info.plist
+      properties:
+        CFBundleDisplayName: ReTypeR 1.3.3
+        CFBundleName: ReTypeR
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        # Keep versions resolved from build settings (single source of truth
+        # in settings.base); without these xcodegen writes literal defaults
+        # "1.0"/"1" into the plist.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true
+        LSMultipleInstancesProhibited: true
+        LSMinimumSystemVersion: "15.0"
+        NSAccessibilityUsageDescription: "ReTypeR нуждается в доступе к функциям Универсального доступа (Accessibility) для чтения выделенного текста и эмуляции нажатий клавиш."
     settings:
-      CODE_SIGN_IDENTITY: "-"
-      CODE_SIGN_STYLE: Automatic
-      CODE_SIGN_ENTITLEMENTS: ""
-      ENABLE_HARDENED_RUNTIME: NO
-      MARKETING_VERSION: "1.1.2"
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.retyper.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # The bundle is renamed to the versioned name only in the DMG staging
+        # (scripts/build_dmg.sh) — renaming the build product itself broke
+        # the test host and re-linked binaries after signing.
+
   ReTypeRTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: Tests
+      - path: Tests/ReTypeRTests
     dependencies:
       - target: ReTypeR
     settings:
-      GENERATE_INFOPLIST_FILE: YES
-packages:
-  KeyboardShortcuts:
-    url: https://github.com/sindresorhus/KeyboardShortcuts
-    from: 2.2.2
+      base:
+        # Tests have no checked-in Info.plist; let Xcode synthesize one so a
+        # plain `xcodebuild test` works without a manual
+        # GENERATE_INFOPLIST_FILE=YES override.
+        GENERATE_INFOPLIST_FILE: YES
+        ENABLE_HARDENED_RUNTIME: "NO"
+        # Same identity as the app: amfid rejects ad-hoc-signed bundles at
+        # launch on current macOS, and the test bundle loads INTO the host
+        # process, so its signature must match the host's trust chain.
+        CODE_SIGN_IDENTITY: "Apple Development: fon2019@mail.ru (VWP6HX9984)"
+        CODE_SIGN_STYLE: "Manual"
+
+schemes:
+  ReTypeR:
+    build:
+      targets:
+        ReTypeR: all
+        ReTypeRTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - ReTypeRTests

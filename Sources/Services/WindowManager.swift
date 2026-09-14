@@ -23,7 +23,7 @@ class WindowManager: ObservableObject {
         let hostingView = NSHostingView(rootView: settingsView)
         
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 640),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -68,7 +68,7 @@ class WindowManager: ObservableObject {
         let hostingView = NSHostingView(rootView: onboardingView)
         
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 280),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -103,6 +103,64 @@ class WindowManager: ObservableObject {
     }
     
     @MainActor
+    func showInfoToast(message: String) {
+        toastTimer?.invalidate()
+        toastWindow?.close()
+        
+        let toastView = InfoToast(message: message)
+        let hostingView = NSHostingView(rootView: toastView)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 56)
+        
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 56),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.contentView = hostingView
+        
+        positionAtBottomCenter(panel)
+        presentToast(panel)
+    }
+    
+    @MainActor
+    private func positionAtBottomCenter(_ panel: NSPanel) {
+        if let screen = NSScreen.main {
+            let screenRect = screen.visibleFrame
+            let x = screenRect.origin.x + (screenRect.size.width - 320) / 2
+            let y = screenRect.origin.y + 40 // 40pt above dock/bottom
+            panel.setFrameOrigin(NSPoint(x: x, y: y))
+        }
+    }
+    
+    @MainActor
+    private func presentToast(_ panel: NSPanel) {
+        self.toastWindow = panel
+        
+        // Fade in
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+        
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            panel.animator().alphaValue = 1.0
+        }
+        
+        // Automatically hide after 1.5 seconds
+        toastTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.hideToast()
+            }
+        }
+    }
+    
+    @MainActor
     func showToast(original: String, converted: String) {
         toastTimer?.invalidate()
         toastWindow?.close()
@@ -124,32 +182,8 @@ class WindowManager: ObservableObject {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = hostingView
         
-        // Position toast at bottom-center of the main screen
-        if let screen = NSScreen.main {
-            let screenRect = screen.visibleFrame
-            let x = screenRect.origin.x + (screenRect.size.width - 320) / 2
-            let y = screenRect.origin.y + 40 // 40pt above dock/bottom
-            panel.setFrameOrigin(NSPoint(x: x, y: y))
-        }
-        
-        self.toastWindow = panel
-        
-        // Fade in
-        panel.alphaValue = 0
-        panel.orderFrontRegardless()
-        
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
-            panel.animator().alphaValue = 1.0
-        }
-        
-        // Automatically hide after 1.5 seconds
-        toastTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
-            guard let self = self else { return }
-            Task { @MainActor in
-                self.hideToast()
-            }
-        }
+        positionAtBottomCenter(panel)
+        presentToast(panel)
     }
     
     @MainActor

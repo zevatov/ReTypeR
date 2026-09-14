@@ -8,7 +8,9 @@ class PreferencesManager: ObservableObject {
     @AppStorage("autoSelectAllText") var autoSelectAllText: Bool = false
     @AppStorage("switchLayoutAfterConversion") var switchLayoutAfterConversion: Bool = true
     @AppStorage("isAppEnabled") var isAppEnabled: Bool = true
-    @AppStorage("isHistoryEnabled") var isHistoryEnabled: Bool = true
+    // Privacy-first: history and conversion log are opt-in (S-03/S-04).
+    @AppStorage("isHistoryEnabled") var isHistoryEnabled: Bool = false
+    @AppStorage("isConversionLogEnabled") var isConversionLogEnabled: Bool = false
     @AppStorage("isSmartRecognitionEnabled") var isSmartRecognitionEnabled: Bool = true
     
     @AppStorage("primaryLayoutID") var primaryLayoutID: String = "com.apple.keylayout.US"
@@ -33,6 +35,7 @@ class PreferencesManager: ObservableObject {
                 secondaryLayoutID = installed[1].id
             }
         }
+        updateMapping()
     }
     
     // Call this when layouts change

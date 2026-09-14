@@ -1,318 +1,320 @@
 import SwiftUI
+import AppKit
+import KeyboardShortcuts
 
+/// Compact popover shown from the menu-bar status item: enable toggle,
+/// hotkey recorder, layout pickers and the recent history.
+/// Styled according to SingAR design language with ReTypeR red brand accents.
 struct MenuBarView: View {
-    @ObservedObject var prefs = PreferencesManager.shared
-    @ObservedObject var stats = StatisticsManager.shared
-    @ObservedObject var permissions = PermissionsManager.shared
-    
-    @State private var isHistoryExpanded = false
+    @ObservedObject private var prefs = PreferencesManager.shared
+    @ObservedObject private var stats = StatisticsManager.shared
+    @ObservedObject private var permissions = PermissionsManager.shared
+
     @State private var installedLayouts: [KeyboardLayoutInfo] = []
-    
-    var popoverHeight: CGFloat {
-        var h: CGFloat = 175 // Base height with margins (prevents squishing)
-        if prefs.isAppEnabled && !permissions.isAccessibilityGranted {
-            h += 42
+    @State private var isHistoryExpanded = false
+    @State private var copiedIndex: Int?
+
+    // Status Dot Color & Subtitle
+    private var statusDotColor: Color {
+        if !prefs.isAppEnabled {
+            return Color.red
+        } else if !permissions.isAccessibilityGranted {
+            return Color.brandAmber
+        } else {
+            return Color.brandGreen
         }
-        if isHistoryExpanded {
-            h += 120
-        }
-        return h
     }
-    
+
+    private var statusSubtitle: String {
+        if !prefs.isAppEnabled {
+            return "На паузе"
+        } else if !permissions.isAccessibilityGranted {
+            return "Требуются разрешения"
+        } else {
+            return "Работает"
+        }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Header
-            HStack(spacing: 8) {
-                KeyboardStatusIcon(statusColor: statusColor)
-                
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("ReTypeR")
-                        .font(.headline)
-                    
+        VStack(spacing: 12) {
+            // Header: Status glyph + App name + Play/Pause & Power buttons
+            HStack(spacing: 10) {
+                // Keyboard icon with status dot
+                ZStack(alignment: .bottomTrailing) {
+                    ZStack {
+                        Circle()
+                            .fill(prefs.isAppEnabled ? Color.brandAccent.opacity(0.15) : Color.secondary.opacity(0.1))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: prefs.isAppEnabled ? "keyboard" : "keyboard.badge.ellipsis")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(prefs.isAppEnabled ? Color.brandAccent : Color.secondary)
+                    }
+
+                    // Always-visible status dot
+                    Circle()
+                        .fill(statusDotColor)
+                        .frame(width: 9, height: 9)
+                        .overlay(
+                            Circle()
+                                .stroke(Color(red: 0.12, green: 0.12, blue: 0.15), lineWidth: 1.5)
+                        )
+                        .offset(x: 1, y: 1)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
-                        Text(prefs.isAppEnabled ? "Активен" : "Приостановлено")
-                            .font(.caption2)
+                        Text("ReTypeR")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.1")")
+                            .font(.system(size: 10))
                             .foregroundColor(.secondary)
-                        
-                        if prefs.isAppEnabled {
-                            Button(action: {
-                                WindowManager.shared.showSettings()
-                            }) {
-                                Text("⌃⇧Space")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .foregroundColor(.secondary.opacity(0.7))
-                            }
-                            .buttonStyle(.plain)
-                            .help("Настройки горячих клавиш")
+                    }
+                    Text(statusSubtitle)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                // Top-Right Control Buttons (Play/Pause + Power)
+                HStack(spacing: 6) {
+                    // Play / Pause Button
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            prefs.isAppEnabled.toggle()
                         }
+                    } label: {
+                        Image(systemName: prefs.isAppEnabled ? "pause.fill" : "play.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(prefs.isAppEnabled ? Color.secondary : Color.brandGreen)
+                            .frame(width: 26, height: 26)
+                            .background(prefs.isAppEnabled ? Color.brandCard : Color.brandGreen.opacity(0.15))
+                            .clipShape(Circle())
                     }
+                    .buttonStyle(.plain)
+                    .help(prefs.isAppEnabled ? "Поставить на паузу (не реагировать на хоткей)" : "Возобновить работу")
+
+                    // Power / Quit Button
+                    Button {
+                        NSApp.terminate(nil)
+                    } label: {
+                        Image(systemName: "power")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Color.secondary)
+                            .frame(width: 26, height: 26)
+                            .background(Color.brandCard)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Выйти из ReTypeR")
                 }
-                
-                Spacer()
-                
-                // Toggle Switch in the Header
-                Toggle("", isOn: $prefs.isAppEnabled)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .controlSize(.small)
             }
-            
+
             Divider()
-            
-            // Warnings (Accessibility access)
-            if prefs.isAppEnabled && !permissions.isAccessibilityGranted {
-                Button(action: {
-                    WindowManager.shared.showOnboarding()
-                }) {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                            .font(.caption)
-                        Text("Предоставить доступ")
-                            .font(.caption)
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(6)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(6)
+
+            // Interactive Hotkeys & Layouts Configuration
+            VStack(spacing: 8) {
+                // Hotkey row
+                HStack {
+                    Label("Хоткей", systemImage: "keyboard")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    KeyboardShortcuts.Recorder(for: .convertText)
                 }
-                .buttonStyle(.plain)
-            }
-            
-            // Layout Info & Selector (Quick switch)
-            HStack {
-                Text("Режим:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                HStack(spacing: 2) {
+                .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                // Layout Switcher A ↔ B
+                HStack {
+                    Label("Раскладки", systemImage: "globe")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    Spacer()
+
                     Menu {
-                        ForEach(installedLayouts, id: \.id) { layout in
+                        ForEach(installedLayouts) { layout in
                             Button(layout.localizedName) {
                                 prefs.primaryLayoutID = layout.id
                                 prefs.updateMapping()
                             }
                         }
                     } label: {
-                        Text(getLayoutName(id: prefs.primaryLayoutID))
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.accentColor) // Matches system accent color
+                        Text(layoutShortName(prefs.primaryLayoutID))
+                            .font(.system(size: 11, weight: .medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.primary.opacity(0.06))
+                            .cornerRadius(5)
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
-                    
-                    Image(systemName: "arrow.left.and.right")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    
+
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 10))
+                        .foregroundColor(prefs.primaryLayoutID == prefs.secondaryLayoutID ? .orange : .secondary)
+
                     Menu {
-                        ForEach(installedLayouts, id: \.id) { layout in
+                        ForEach(installedLayouts) { layout in
                             Button(layout.localizedName) {
                                 prefs.secondaryLayoutID = layout.id
                                 prefs.updateMapping()
                             }
                         }
                     } label: {
-                        Text(getLayoutName(id: prefs.secondaryLayoutID))
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.accentColor) // Matches system accent color
+                        Text(layoutShortName(prefs.secondaryLayoutID))
+                            .font(.system(size: 11, weight: .medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.primary.opacity(0.06))
+                            .cornerRadius(5)
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
                 }
             }
-            
-            Divider()
-            
-            // Stats & History Row
-            HStack(spacing: 8) {
-                // Conversions
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.left.arrow.right")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                    Text("\(stats.totalConversions)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                }
-                .help("Конвертации")
-                
-                Spacer()
-                
-                // Characters
-                HStack(spacing: 4) {
-                    Image(systemName: "character")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                    Text("\(stats.totalCharactersConverted)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                }
-                .help("Символы")
-                
-                Spacer()
-                
-                // History Expand Button
-                Button(action: {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                        isHistoryExpanded.toggle()
-                    }
-                }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 10))
-                        Text("История")
-                            .font(.system(size: 10, weight: .medium))
-                    }
-                    .foregroundColor(isHistoryExpanded ? .accentColor : .secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.primary.opacity(isHistoryExpanded ? 0.08 : 0.03))
-                    .cornerRadius(4)
-                }
-                .buttonStyle(.plain)
-            }
-            
-            // Expanded History List
+            .padding(10)
+            .background(Color.brandCard)
+            .cornerRadius(8)
+
+            // Collapsible History View
             if isHistoryExpanded {
-                VStack(spacing: 0) {
-                    if !prefs.isHistoryEnabled {
-                        Text("История отключена")
-                            .font(.caption)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Недавние записи")
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.secondary)
-                            .italic()
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
-                    } else if stats.history.isEmpty {
+                        Spacer()
+                        Text("Нажмите для копирования")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
+
+                    let entries = Array(stats.history.prefix(8))
+                    if entries.isEmpty {
                         Text("История пуста")
-                            .font(.caption)
+                            .font(.system(size: 11))
                             .foregroundColor(.secondary)
-                            .italic()
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                     } else {
                         ScrollView {
                             VStack(spacing: 5) {
-                                ForEach(stats.history.prefix(15)) { record in
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(record.original)
-                                            .font(.system(size: 9))
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(1)
-                                        Text(record.converted)
-                                            .font(.system(size: 10, weight: .medium))
-                                            .foregroundColor(.primary)
-                                            .lineLimit(1)
+                                ForEach(Array(entries.enumerated()), id: \.element.id) { index, record in
+                                    Button {
+                                        copyToClipboard(record.converted, at: index)
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            HStack {
+                                                Text(formatTime(record.timestamp))
+                                                    .font(.system(size: 9))
+                                                    .foregroundColor(.secondary)
+                                                Spacer()
+                                                if copiedIndex == index {
+                                                    Text("Скопировано!")
+                                                        .font(.system(size: 9, weight: .bold))
+                                                        .foregroundColor(Color.brandGreen)
+                                                } else {
+                                                    Text(record.original)
+                                                        .font(.system(size: 9))
+                                                        .foregroundColor(.secondary.opacity(0.6))
+                                                        .lineLimit(1)
+                                                }
+                                            }
+
+                                            Text(record.converted)
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.primary)
+                                                .lineLimit(2)
+                                                .multilineTextAlignment(.leading)
+                                        }
+                                        .padding(6)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(copiedIndex == index ? Color.brandGreen.opacity(0.12) : Color.brandCard)
+                                        .cornerRadius(6)
                                     }
-                                    .padding(.vertical, 3)
-                                    .padding(.horizontal, 5)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.primary.opacity(0.02))
-                                    .cornerRadius(4)
+                                    .buttonStyle(.plain)
                                 }
                             }
+                            .padding(.vertical, 2)
                         }
-                        .frame(maxHeight: 100)
+                        .frame(minHeight: 90, maxHeight: 170)
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
-            
+
             Divider()
-            
-            // Action Buttons
-            HStack(spacing: 6) {
-                Button(action: {
-                    WindowManager.shared.showSettings()
-                }) {
-                    HStack {
-                        Spacer()
-                        Image(systemName: "gearshape")
-                            .font(.subheadline)
-                        Spacer()
+
+            // Footer action buttons (2 buttons 50/50 width)
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        isHistoryExpanded.toggle()
                     }
-                    .padding(.vertical, 6)
+                } label: {
+                    Label(isHistoryExpanded ? "Скрыть" : "История", systemImage: "clock.arrow.circlepath")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
+                .padding(6)
+                .background(Color.primary.opacity(isHistoryExpanded ? 0.08 : 0.04))
+                .cornerRadius(6)
+
+                Button {
+                    DispatchQueue.main.async {
+                        NSApp.sendAction(#selector(NSPopover.performClose(_:)), to: nil, from: nil)
+                        WindowManager.shared.showSettings()
+                    }
+                } label: {
+                    Label("Настройки", systemImage: "gearshape")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .padding(6)
                 .background(Color.primary.opacity(0.04))
                 .cornerRadius(6)
-                
-                Button(action: {
-                    (NSApplication.shared.delegate as? AppDelegate)?.confirmExit()
-                }) {
-                    HStack {
-                        Spacer()
-                        Image(systemName: "power")
-                            .font(.subheadline)
-                        Spacer()
-                    }
-                    .padding(.vertical, 6)
-                    .foregroundColor(.white)
-                }
-                .buttonStyle(.plain)
-                .background(Color.red)
-                .cornerRadius(6)
             }
         }
-        .padding(12)
-        .frame(width: 250, height: popoverHeight)
-        .background(.ultraThinMaterial)
+        .padding(14)
+        .frame(width: 290)
         .onAppear {
             LayoutMapper.shared.refreshAvailableLayouts()
-            self.installedLayouts = LayoutMapper.shared.getInstalledLayouts()
-            
-            // Let the popover know its initial content size
-            if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
-                appDelegate.popover.contentSize = NSSize(width: 250, height: popoverHeight)
-            }
-        }
-        .onChange(of: popoverHeight) { _, newHeight in
-            if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
-                appDelegate.popover.contentSize = NSSize(width: 250, height: newHeight)
-            }
+            installedLayouts = LayoutMapper.shared.getInstalledLayouts()
+            permissions.checkAccessibility()
         }
     }
-    
-    private var statusColor: Color {
-        if !prefs.isAppEnabled { return .red }
-        return permissions.isAccessibilityGranted ? .green : .orange
-    }
-    
-    private func getLayoutName(id: String) -> String {
-        let layouts = LayoutMapper.shared.getInstalledLayouts()
-        if let layout = layouts.first(where: { $0.id == id }) {
-            return layout.localizedName
-        }
-        return id.components(separatedBy: ".").last ?? id
-    }
-}
 
-struct KeyboardStatusIcon: View {
-    let statusColor: Color
-    
-    var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Image(systemName: "keyboard")
-                .font(.title3)
-                .foregroundColor(.white) // Force to white matching menu bar
-            
-            Circle()
-                .fill(statusColor)
-                .frame(width: 6, height: 6)
-                .overlay(
-                    Circle()
-                        .stroke(Color(NSColor.windowBackgroundColor), lineWidth: 1)
-                )
-                .offset(x: 2, y: 2)
+    // MARK: - Helpers
+
+    private func copyToClipboard(_ text: String, at index: Int) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        withAnimation {
+            copiedIndex = index
         }
-        .frame(width: 20, height: 16)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if copiedIndex == index {
+                withAnimation {
+                    copiedIndex = nil
+                }
+            }
+        }
+    }
+
+    private func layoutShortName(_ id: String) -> String {
+        let fullName = installedLayouts.first(where: { $0.id == id })?.localizedName ?? "…"
+        if fullName.contains("Russian") || fullName.contains("Русская") { return "Русская" }
+        if fullName.contains("U.S.") || fullName.contains("English") || fullName.contains("США") { return "English" }
+        return fullName
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }

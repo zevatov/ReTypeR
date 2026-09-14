@@ -1,37 +1,44 @@
 import Foundation
 import ServiceManagement
+import Combine
 
+/// Manages the "launch at login" toggle via SMAppService (macOS 13+).
 class LaunchManager: ObservableObject {
     static let shared = LaunchManager()
-    
+
     @Published var isLaunchAtLoginEnabled: Bool = false
-    
-    init() {
-        self.isLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+
+    private init() {
+        isLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
         setupDefaultLaunchAtLogin()
     }
-    
+
+    /// First-run convenience: register launch-at-login once, silently.
     private func setupDefaultLaunchAtLogin() {
         let key = "hasSetDefaultLaunchAtLogin"
-        if !UserDefaults.standard.bool(forKey: key) {
-            setLaunchAtLogin(true)
-            UserDefaults.standard.set(true, forKey: key)
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+
+        guard SMAppService.mainApp.status == .notRegistered else { return }
+        do {
+            try SMAppService.mainApp.register()
+            isLaunchAtLoginEnabled = true
+        } catch {
+            NSLog("Failed to toggle launch at login: \(error.localizedDescription)")
         }
     }
-    
+
     func setLaunchAtLogin(_ enabled: Bool) {
         do {
             if enabled {
-                if SMAppService.mainApp.status == .enabled { return }
                 try SMAppService.mainApp.register()
             } else {
                 try SMAppService.mainApp.unregister()
             }
-            self.isLaunchAtLoginEnabled = enabled
+            isLaunchAtLoginEnabled = enabled
         } catch {
-            print("Failed to toggle launch at login: \(error)")
-            // Revert on failure
-            self.isLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+            NSLog("Failed to toggle launch at login: \(error.localizedDescription)")
+            isLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
         }
     }
 }
