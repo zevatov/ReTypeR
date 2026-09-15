@@ -7,6 +7,7 @@ struct SettingsView: View {
     @ObservedObject var launch = LaunchManager.shared
     @ObservedObject var stats = StatisticsManager.shared
     @ObservedObject var permissions = PermissionsManager.shared
+    @ObservedObject private var updateChecker = UpdateChecker.shared
 
     @State private var installedLayouts: [KeyboardLayoutInfo] = []
     @State private var isHistoryExpanded = false
@@ -32,15 +33,37 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("ReTypeR")
                             .font(.system(size: 18, weight: .bold))
-                        Text("Умная смена раскладки клавиатуры • Версия \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.4")")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 6) {
+                            Text("Умная смена раскладки клавиатуры • Версия \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.4")")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+
+                            if case .updateAvailable(let version, _) = updateChecker.status {
+                                Button(action: {
+                                    updateChecker.openUpdateTarget()
+                                }) {
+                                    HStack(spacing: 3) {
+                                        Circle()
+                                            .fill(Color.orange)
+                                            .frame(width: 6, height: 6)
+                                        Text("Доступна \(version)")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundColor(.orange)
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.orange.opacity(0.12))
+                                    .cornerRadius(4)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     }
 
                     Spacer()
 
                     HStack(spacing: 8) {
-                        Link(destination: URL(string: "https://t.me/retyper_app") ?? URL(string: "https://telegram.org")!) {
+                        Link(destination: URL(string: "https://t.me/+rchqdp7ARSw2Njdi") ?? URL(string: "https://telegram.org")!) {
                             HStack(spacing: 4) {
                                 Image(systemName: "paperplane.fill")
                                     .font(.system(size: 11))
@@ -503,6 +526,7 @@ struct SettingsView: View {
             LayoutMapper.shared.refreshAvailableLayouts()
             installedLayouts = LayoutMapper.shared.getInstalledLayouts()
             permissions.checkAccessibility()
+            updateChecker.checkForUpdates()
         }
     }
 

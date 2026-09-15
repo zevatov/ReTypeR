@@ -1,28 +1,25 @@
 #!/bin/bash
 # Builds ReTypeR.app (Release) and packages it into a drag-and-drop DMG
-# ("ReTypeR 1.3.4") at the repo root.
+# ("ReTypeR.dmg") at the repo root.
 #
-# The DMG contains the app next to an /Applications symlink, so installation
-# is a single drag in Finder.
+# The DMG contains the app next to an /Applications symlink, styled with
+# custom background, icon positioning, and branding.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 APP_NAME="ReTypeR"
-# Installed .app name is versioned so multiple installed versions are
-# distinguishable in /Applications (owner request). The BUILD product stays
-# "ReTypeR.app" (renaming it broke the test host and re-linked binaries after
-# signing); the rename to the versioned name happens in STAGING below, with a
-# re-sign of the renamed bundle.
-INSTALLED_NAME="ReTypeR 1.3.4"
-DMG_TITLE="$INSTALLED_NAME"
-DMG_PATH="$ROOT/$INSTALLED_NAME.dmg"
+DMG_TITLE="$APP_NAME"
+DMG_PATH="$ROOT/$APP_NAME.dmg"
 BUILD_DIR="$ROOT/build/DerivedData"
 APP_PATH="$BUILD_DIR/Build/Products/Release/$APP_NAME.app"
 STAGING="$ROOT/build/dmg-staging"
-STAGED_APP_PATH="$STAGING/$INSTALLED_NAME.app"
+STAGED_APP_PATH="$STAGING/$APP_NAME.app"
 SIGN_IDENTITY="Apple Development"
+
+echo "==> Regenerating Xcode project with XcodeGen…"
+xcodegen generate
 
 echo "==> Building Release configuration…"
 xcodebuild build \
@@ -41,18 +38,12 @@ fi
 echo "==> Cleaning extended attributes (codesign detritus guard)…"
 xattr -cr "$APP_PATH" 2>/dev/null || true
 
-echo "==> Preparing drag-and-drop staging folder (copying to versioned name)…"
+echo "==> Preparing drag-and-drop staging folder…"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
-# Copying straight to the versioned name IS the rename.
 cp -R "$APP_PATH" "$STAGED_APP_PATH"
 
-echo "==> Re-signing the RENAMED bundle (Apple Development identity, hardened runtime)…"
-# TCC (Accessibility; Screen Recording removed 2026-09-14 with OCR mode) persists per code signature. Ad-hoc
-# signatures change on every rebuild, so granted permissions silently reset.
-# The Apple Development identity carries a stable Team ID — sign with it so
-# permissions granted once survive rebuilds and updates. Signing happens AFTER
-# the rename so the seal covers the final bundle shape.
+echo "==> Re-signing bundle (Apple Development identity, hardened runtime)…"
 xattr -cr "$STAGED_APP_PATH" 2>/dev/null || true
 codesign --force --deep --sign "$SIGN_IDENTITY" --options runtime --timestamp=none "$STAGED_APP_PATH"
 
@@ -66,17 +57,18 @@ codesign -dv "$STAGED_APP_PATH" 2>&1 | grep -E "Authority|TeamIdentifier" || tru
 echo "==> Staged app size:"
 du -sh "$STAGED_APP_PATH"
 
-# Drag-and-drop target: standard /Applications symlink.
-ln -s /Applications "$STAGING/Applications"
-
 echo "==> Removing stale DMG…"
 rm -f "$DMG_PATH"
 
-echo "==> Creating DMG…"
-hdiutil create -volname "$DMG_TITLE" \
-    -srcfolder "$STAGING" \
-    -ov -format UDZO \
-    "$DMG_PATH"
+echo "==> Creating DMG via dmgbuild…"
+/opt/anaconda3/bin/dmgbuild -s "$ROOT/dmg_settings.py" \
+    -D app="$STAGED_APP_PATH" \
+    -D background="$ROOT/dmg_background.png" \
+    -D icon="$ROOT/scripts/dmg_assets/icon.icns" \
+    "$DMG_TITLE" "$DMG_PATH"
+
+echo "==> Setting custom icon on DMG file…"
+swift "$ROOT/scripts/set_dmg_icon.swift" "$DMG_PATH" "$ROOT/scripts/dmg_assets/app_icon.png"
 
 rm -rf "$STAGING"
 
