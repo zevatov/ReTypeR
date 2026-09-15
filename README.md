@@ -1,6 +1,12 @@
 # ReTypeR
 
-**ReTypeR** — утилита для macOS, которая исправляет текст, набранный в неправильной
+[![macOS](https://img.shields.io/badge/macOS-15.0%2B-blue?style=flat-square&logo=apple)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-5.9-orange?style=flat-square&logo=swift)](https://swift.org)
+[![Tests](https://img.shields.io/badge/Tests-61%20passing-brightgreen?style=flat-square)](Tests/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.3.4%20(build%205)-purple?style=flat-square)](project.yml)
+
+**ReTypeR** — нативная утилита для macOS, которая исправляет текст, набранный в неправильной
 раскладке клавиатуры: `ghbdtn` → `привет`, `руддщ` → `hello`. Работает с любой парой
 раскладок через умный анализ текста (v1.3). Вся обработка выполняется локально, без сети.
 
@@ -52,18 +58,23 @@
 ## Установка
 
 1. Откройте DMG-образ приложения (соберите его локально через `scripts/build_dmg.sh`
-   — см. раздел «Сборка» — или получите артефакт напрямую от владельца проекта).
-   Исходники планируются в **приватном** GitHub-репозитории `zevatov/ReTypeR`
-   (на 2026-09-15 репо ещё не создано); публичная страница релизов
-   не публикуется.
+   или используйте готовый релизный образ `ReTypeR.dmg`).
+   Исходники размещены в GitHub-репозитории [`zevatov/ReTypeR`](https://github.com/zevatov/ReTypeR).
 2. Перетащите **ReTypeR** в папку **Applications**.
 3. Запустите приложение из **Applications**. При первом запуске:
    - Выдайте разрешение **Accessibility** в окне онбординга — оно обязательно для
      хоткей-конвертации.
    - Приложение подписано персональным сертификатом Apple Development; notarization
-     не выполняется, поэтому Gatekeeper может показать предупреждение при первом запуске.
+     не выполнялся, поэтому Gatekeeper может показать предупреждение при первом запуске.
    - Выданные разрешения сохраняются между обновлениями и перезагрузками благодаря
      стабильному Team ID подписи.
+
+## Обновления
+
+ReTypeR включает минималистичную проверку обновлений:
+- Приложение периодически проверяет наличие новых версий на GitHub Releases или в канале разработки [`t.me/vostr_dev`](https://t.me/vostr_dev).
+- При обнаружении новой версии в окне «Настройки» отображается ненавязчивый индикатор со ссылкой на релиз.
+- Никакие персональные данные или телеметрия при этом не передаются.
 
 ## Приватность
 
@@ -89,10 +100,10 @@ xcodegen generate          # генерирует ReTypeR.xcodeproj из project
 xcodebuild build -project ReTypeR.xcodeproj -scheme ReTypeR -configuration Release
 ```
 
-Или сборка DMG одной командой:
+Или брендированная сборка DMG одной командой:
 
 ```bash
-scripts/build_dmg.sh       # → ReTypeR 1.3.4.dmg в корне проекта
+scripts/build_dmg.sh       # → ReTypeR.dmg в корне проекта
 ```
 
 Тесты:

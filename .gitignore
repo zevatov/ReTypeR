@@ -51,6 +51,10 @@ roo_task_*.md
 .env.*
 *.pem
 *.p12
+*.key
+*.keystore
+*.cer
+*.crt
 
 # Local Archives
 archive/

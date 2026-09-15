@@ -263,7 +263,7 @@ delete/move/rename и full-Obsidian запрещены.
 > **Рабочая директория:** `/Users/stanislav/Проекты/ReTypeR`  
 > **Текущая версия проекта:** `1.3.1` (артефакт `ReTypeR 1.3.1.dmg`)  
 > **Целевая версия:** `1.3.2` (артефакт `ReTypeR 1.3.2.dmg`)  
-> **Идентификатор подписи:** `Apple Development: fon2019@mail.ru (VWP6HX9984)` (Team ID `VWP6HX9984`, hardened runtime)
+> **Идентификатор подписи:** `Apple Development: fonXXXX@mail.ru (VWP6…984)` (Team ID `VWP6…984`, hardened runtime)
 
 ---
 
@@ -461,7 +461,7 @@ delete/move/rename и full-Obsidian запрещены.
 
 4. **Релизная сборка и подпись:**
    - `project.yml`: `MARKETING_VERSION: "1.3.2"`, `CURRENT_PROJECT_VERSION: "3"`, `CFBundleDisplayName: ReTypeR 1.3.2`, Hardened Runtime включен для Release и отключен для тестового таргета (устранена ошибка LaunchServices).
-   - Скрипт `scripts/build_dmg.sh`: успешно собирает и подписывает приложение сертификатом `Apple Development: fon2019@mail.ru (VWP6HX9984)`, проверяет deep/strict подпись и пакует в `ReTypeR 1.3.2.dmg`.
+   - Скрипт `scripts/build_dmg.sh`: успешно собирает и подписывает приложение сертификатом `Apple Development: fonXXXX@mail.ru (VWP6…984)`, проверяет deep/strict подпись и пакует в `ReTypeR 1.3.2.dmg`.
    - Контрольная сумма DMG валидна (`hdiutil verify: checksum is VALID`).
 
 ---
@@ -471,7 +471,7 @@ delete/move/rename и full-Obsidian запрещены.
 > **Статус:** ВСЕ ЗАДАЧИ ВЫПОЛНЕНЫ.  
 > **Юнит-тесты:** 70/70 тестов успешно пройдены (0 failures, 1.36 с).  
 > **Релизный артефакт:** `ReTypeR 1.3.3.dmg` (2.7 МБ, SHA-256 `d701076c12ab02f4f2589f0d10ff955678896d3f216f94b025e3f6f6714f604b`).  
-> **Установлено в `/Applications`:** `ReTypeR 1.3.3.app` с сертификатом `Apple Development: fon2019@mail.ru (VWP6HX9984)`.
+> **Установлено в `/Applications`:** `ReTypeR 1.3.3.app` с сертификатом `Apple Development: fonXXXX@mail.ru (VWP6…984)`.
 
 ### 1. Устраненные дефекты и новые возможности
 
