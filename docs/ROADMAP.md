@@ -13,6 +13,10 @@
 > с персональным сертификатом Apple Development (`fonXXXX@mail.ru`,
 > Team `3ZMM…J2P`, Hardened Runtime); notarization не выполнялся.
 > Текущий план: [`docs/ref-audit-handoffs.md`](ref-audit-handoffs.md).
+> **Следующая сессия: [`docs/HANDOFF_GEMINI_38.md`](HANDOFF_GEMINI_38.md)** —
+> private GitHub `zevatov/ReTypeR`, чистка [.gitignore](../.gitignore),
+> synthetic verification (61 тест), кнопки Telegram/GitHub post-deploy,
+> решение OD по auto-update (private source vs public Releases).
 
 ## Текущее состояние (evidence на 2026-09-14)
 

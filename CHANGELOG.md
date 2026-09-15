@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+- Следующая сессия — публикация private GitHub (`zevatov/ReTypeR`) и решение
+  по auto-update (см. [`docs/HANDOFF_GEMINI_38.md`](docs/HANDOFF_GEMINI_38.md)).
+
 ## [1.3.4] — 2026-09-14
 
 ### Removed

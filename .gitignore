@@ -45,3 +45,13 @@ dist/
 
 # Scratch & Temporary transcripts
 roo_task_*.md
+
+# Secrets & Environment
+.env
+.env.*
+*.pem
+*.p12
+
+# Local Archives
+archive/
+dist/archive/
