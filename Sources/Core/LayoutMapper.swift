@@ -53,15 +53,17 @@ class LayoutMapper {
             refreshAvailableLayouts()
         }
         
-        guard let sourceA = findLayout(for: layoutAID),
-              let sourceB = findLayout(for: layoutBID) else {
-            NSLog("[LayoutMapper] Failed to find layout sources for %@ or %@", layoutAID, layoutBID)
-            return
-        }
+        let sourceA = findLayout(for: layoutAID)
+        let sourceB = findLayout(for: layoutBID)
+        let resolvedDataA = sourceA.flatMap { getKeyboardLayoutData(from: $0) }
+        let resolvedDataB = sourceB.flatMap { getKeyboardLayoutData(from: $0) }
         
-        guard let dataA = getKeyboardLayoutData(from: sourceA),
-              let dataB = getKeyboardLayoutData(from: sourceB) else {
-            NSLog("[LayoutMapper] Failed to get keyboard layout data for %@ or %@", layoutAID, layoutBID)
+        guard let dataA = resolvedDataA, let dataB = resolvedDataB else {
+            applyHardcodedFallbackOrClear(
+                layoutAID: layoutAID,
+                layoutBID: layoutBID,
+                sourcesMissing: sourceA == nil || sourceB == nil
+            )
             return
         }
         
@@ -228,7 +230,63 @@ class LayoutMapper {
         TISSelectInputSource(source)
     }
     
+    /// US ABC ↔ Mac Russian (ЙЦУКЕН), lower + upper. Digits and identical
+    /// punctuation are omitted: only pairs that differ and include a letter.
+    private static let fallbackUStoRU: [Character: Character] = [
+        "q": "й", "w": "ц", "e": "у", "r": "к", "t": "е", "y": "н", "u": "г", "i": "ш", "o": "щ", "p": "з", "[": "х", "]": "ъ",
+        "a": "ф", "s": "ы", "d": "в", "f": "а", "g": "п", "h": "р", "j": "о", "k": "л", "l": "д", ";": "ж", "'": "э",
+        "z": "я", "x": "ч", "c": "с", "v": "м", "b": "и", "n": "т", "m": "ь", ",": "б", ".": "ю", "`": "ё",
+        "Q": "Й", "W": "Ц", "E": "У", "R": "К", "T": "Е", "Y": "Н", "U": "Г", "I": "Ш", "O": "Щ", "P": "З", "{": "Х", "}": "Ъ",
+        "A": "Ф", "S": "Ы", "D": "В", "F": "А", "G": "П", "H": "Р", "J": "О", "K": "Л", "L": "Д", ":": "Ж", "\"": "Э",
+        "Z": "Я", "X": "Ч", "C": "С", "V": "М", "B": "И", "N": "Т", "M": "Ь", "<": "Б", ">": "Ю", "~": "Ё"
+    ]
+    
     // MARK: - Private Helpers
+    
+    private func applyHardcodedFallbackOrClear(layoutAID: String, layoutBID: String, sourcesMissing: Bool) {
+        if Self.isHardcodedUSRussianPair(layoutAID, layoutBID) {
+            let usToRU = Self.fallbackUStoRU
+            let ruToUS = Dictionary(uniqueKeysWithValues: usToRU.map { ($0.value, $0.key) })
+            if Self.isUSABCLayout(layoutAID) {
+                aToBMap = usToRU
+                bToAMap = ruToUS
+            } else {
+                aToBMap = ruToUS
+                bToAMap = usToRU
+            }
+            NSLog("[LayoutMapper] Using hardcoded fallback map (TIS API unavailable in headless environment)")
+            NSLog("[LayoutMapper] Built bidirectional map with %d entries between %@ and %@", aToBMap.count, layoutAID, layoutBID)
+            return
+        }
+        
+        self.aToBMap = [:]
+        self.bToAMap = [:]
+        if sourcesMissing {
+            NSLog("[LayoutMapper] Failed to find layout sources for %@ or %@", layoutAID, layoutBID)
+        } else {
+            NSLog("[LayoutMapper] Failed to get keyboard layout data for %@ or %@", layoutAID, layoutBID)
+        }
+    }
+    
+    private static func isHardcodedUSRussianPair(_ layoutAID: String, _ layoutBID: String) -> Bool {
+        let aIsUS = isUSABCLayout(layoutAID)
+        let bIsUS = isUSABCLayout(layoutBID)
+        let aIsRU = isMacRussianLayout(layoutAID)
+        let bIsRU = isMacRussianLayout(layoutBID)
+        return (aIsUS && bIsRU) || (aIsRU && bIsUS)
+    }
+    
+    /// ABC, `.US`, and `com.apple.keylayout.US`. Bare "us" is intentionally
+    /// not matched: it is a substring of "Russian".
+    private static func isUSABCLayout(_ id: String) -> Bool {
+        let lower = id.lowercased()
+        return lower.contains("abc") || lower.contains(".us") || lower == "com.apple.keylayout.us"
+    }
+    
+    /// Mac Russian. `RussianWin` also matches: the Win suffix is not required.
+    private static func isMacRussianLayout(_ id: String) -> Bool {
+        id.lowercased().contains("russian")
+    }
     
     private func findLayout(for id: String) -> TISInputSource? {
         if let exact = availableLayouts.first(where: { getLayoutID(for: $0) == id }) {

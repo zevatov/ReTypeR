@@ -59,13 +59,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PermissionsManager.shared.$isAccessibilityGranted
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.updateStatusIcon()
+                Task { @MainActor in
+                    self?.updateStatusIcon()
+                }
             }
             .store(in: &cancellables)
 
         // Periodic heartbeat to refresh icon and detect permission/theme changes (identical to SingAR)
         statusTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateStatusIcon()
+            Task { @MainActor in
+                self?.updateStatusIcon()
+            }
         }
     }
 
