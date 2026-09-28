@@ -65,7 +65,7 @@ struct MenuBarView: View {
                     HStack(spacing: 4) {
                         Text("ReTypeR")
                             .font(.system(size: 14, weight: .bold))
-                        Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.4")")
+                        Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.5")")
                             .font(.system(size: 10))
                             .foregroundColor(.secondary)
                     }

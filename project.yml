@@ -13,16 +13,21 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "1.3.4"
-    CURRENT_PROJECT_VERSION: "5"
-    # Real Apple Development identity (stable Team ID): amfid on current
-    # macOS rejects ad-hoc signatures at launch ("The file is adhoc signed
-    # or signed by an unknown certificate chain"), so Development-identity
-    # signing is now REQUIRED for the app to run at all. Bonus: a stable
-    # identity means TCC permissions granted once survive rebuilds.
-    # Exact common name + Manual style: automatic signing looks for the
-    # legacy "Mac Development" type and mismatches the certificate's OU.
-    CODE_SIGN_IDENTITY: "Apple Development: fon2019@mail.ru (VWP6HX9984)"
+    MARKETING_VERSION: "1.3.5"
+    CURRENT_PROJECT_VERSION: "6"
+    # Real Apple Development identity (stable public Team ID): amfid on
+    # current macOS rejects ad-hoc signatures at launch ("The file is adhoc
+    # signed or signed by an unknown certificate chain"), so Development-
+    # identity signing is now REQUIRED for the app to run at all. Bonus: a
+    # stable identity means TCC permissions granted once survive rebuilds.
+    # Team ID is public and required so Xcode can pick a development team
+    # without a provisioning profile. The certificate common name is not
+    # stored in the repo. Manual style stays — automatic signing looks for
+    # the legacy "Mac Development" type and mismatches the certificate's OU.
+    # CI disables signing anyway (CODE_SIGNING_ALLOWED=NO in
+    # .github/workflows/ci.yml).
+    CODE_SIGN_IDENTITY: "Apple Development"
+    DEVELOPMENT_TEAM: "3ZMM724J2P"
     CODE_SIGN_STYLE: "Manual"
     # Xcode 26 builds the app as a thin stub + ReTypeR.debug.dylib in Debug;
     # the xctest bundle then links @rpath/ReTypeR.debug.dylib and Launch
@@ -54,7 +59,7 @@ targets:
     info:
       path: Sources/App/Info.plist
       properties:
-        CFBundleDisplayName: ReTypeR 1.3.4
+        CFBundleDisplayName: ReTypeR 1.3.5
         CFBundleName: ReTypeR
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         # Keep versions resolved from build settings (single source of truth
@@ -88,10 +93,11 @@ targets:
         # GENERATE_INFOPLIST_FILE=YES override.
         GENERATE_INFOPLIST_FILE: YES
         ENABLE_HARDENED_RUNTIME: "NO"
-        # Same identity as the app: amfid rejects ad-hoc-signed bundles at
-        # launch on current macOS, and the test bundle loads INTO the host
-        # process, so its signature must match the host's trust chain.
-        CODE_SIGN_IDENTITY: "Apple Development: fon2019@mail.ru (VWP6HX9984)"
+        # Same identity as the app (generic "Apple Development", no e-mail):
+        # amfid rejects ad-hoc-signed bundles at launch on current macOS, and
+        # the test bundle loads INTO the host process, so its signature must
+        # match the host's trust chain.
+        CODE_SIGN_IDENTITY: "Apple Development"
         CODE_SIGN_STYLE: "Manual"
 
 schemes:

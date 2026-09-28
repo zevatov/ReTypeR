@@ -43,7 +43,7 @@ final class UpdateChecker: ObservableObject {
                 
                 let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
                 let latestVersion = release.tag_name.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
-                let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.4"
+                let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.5"
                 
                 if isVersion(latestVersion, newerThan: currentVersion), let url = URL(string: release.html_url) {
                     self.status = .updateAvailable(version: latestVersion, url: url)

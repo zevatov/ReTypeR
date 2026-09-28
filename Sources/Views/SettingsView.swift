@@ -34,7 +34,7 @@ struct SettingsView: View {
                         Text("ReTypeR")
                             .font(.system(size: 18, weight: .bold))
                         HStack(spacing: 6) {
-                            Text("Умная смена раскладки клавиатуры • Версия \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.4")")
+                            Text("Умная смена раскладки клавиатуры • Версия \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.5")")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
 

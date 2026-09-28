@@ -6,8 +6,28 @@
 
 ## [Unreleased]
 
-- Следующая сессия — публикация private GitHub (`zevatov/ReTypeR`) и решение
-  по auto-update (см. [`docs/HANDOFF_GEMINI_38.md`](docs/HANDOFF_GEMINI_38.md)).
+## [1.3.5] — 2026-09-28
+
+### Added
+
+- **Fallback-карта US↔Mac Russian**: если TIS не вернул layout data
+  (например, headless CI без пользовательских раскладок), конвертация
+  использует встроенную карту соответствий; алгоритм конвертации
+  не менялся.
+
+### Fixed
+
+- **Swift 6 Timer**: обновление статус-иконки (`updateStatusIcon`)
+  выполняется внутри `@MainActor Task` — устранены гонки обновления UI
+  статус-бара.
+
+### Changed
+
+- Версия приложения: **1.3.5 / build 6** (`MARKETING_VERSION`,
+  `CURRENT_PROJECT_VERSION` в [`project.yml`](project.yml)).
+- Подпись в [`project.yml`](project.yml): идентификатор `Apple Development`
+  без e-mail сертификата, `DEVELOPMENT_TEAM` `3ZMM724J2P`, Hardened Runtime
+  в Release-конфигурации.
 
 ## [1.3.4] — 2026-09-14
 
