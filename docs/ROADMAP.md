@@ -7,8 +7,9 @@
 > не менялся. **GitHub Release [v1.3.5](https://github.com/zevatov/ReTypeR/releases/tag/v1.3.5)
 > опубликован** (вложение `ReTypeR.dmg` 4.0 МБ, тег `v1.3.5` → `17070e2`);
 > репозиторий `zevatov/ReTypeR` остаётся **private** до открытия владельцем.
-> CI-прогон для `17070e2` ([run 36384322218](https://github.com/zevatov/ReTypeR/actions/runs/36384322218))
-> завершён: **conclusion = failure** — требует разбора владельцем.
+> Релиз v1.3.5 остаётся на теге `17070e2` (релизный DMG). Фикс пустой TIS-карты —
+> коммит на `main` после тега. CI-прогон [36385928748](https://github.com/zevatov/ReTypeR/actions/runs/36385928748)
+> на `4bbf952` — **success**. Репозиторий private.
 > Юнит-тесты на момент последней проверки: **61/61 passed** (новый прогон не выполнялся).
 > Релиз v1.3.4 был опубликован на GitHub ранее (тег `v1.3.4`, DMG 4.0 МБ,
 > Discussions, лейблы, руководства сообщества). Продуктовый OCR-режим удалён
