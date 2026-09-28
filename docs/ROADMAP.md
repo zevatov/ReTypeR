@@ -1,11 +1,14 @@
 # ReTypeR — дорожная карта v1.3.5
 
 > ✅ **АКТУАЛЬНОЕ СОСТОЯНИЕ НА 2026-09-28 (v1.3.5 / build 6):**
-> Локально подготовлен релиз **1.3.5 / build 6** ([`project.yml`](../project.yml)):
+> Релиз **1.3.5 / build 6** ([`project.yml`](../project.yml)):
 > fallback-карта US↔Mac Russian, если TIS не отдал layout data (headless CI);
 > `updateStatusIcon` выполняется в `@MainActor Task`; алгоритм конвертации
-> не менялся. **DMG собран локально, GitHub Release 1.3.5 ещё НЕ опубликован**;
-> репозиторий `zevatov/ReTypeR` остаётся **private** до команды владельца.
+> не менялся. **GitHub Release [v1.3.5](https://github.com/zevatov/ReTypeR/releases/tag/v1.3.5)
+> опубликован** (вложение `ReTypeR.dmg` 4.0 МБ, тег `v1.3.5` → `17070e2`);
+> репозиторий `zevatov/ReTypeR` остаётся **private** до открытия владельцем.
+> CI-прогон для `17070e2` ([run 36384322218](https://github.com/zevatov/ReTypeR/actions/runs/36384322218))
+> завершён: **conclusion = failure** — требует разбора владельцем.
 > Юнит-тесты на момент последней проверки: **61/61 passed** (новый прогон не выполнялся).
 > Релиз v1.3.4 был опубликован на GitHub ранее (тег `v1.3.4`, DMG 4.0 МБ,
 > Discussions, лейблы, руководства сообщества). Продуктовый OCR-режим удалён
@@ -25,7 +28,7 @@
 | Мультимониторный статус-бар | ✅ исправлен | Чистый `com.retyper.app`, отказ от `autosaveName`, прямое рисование SF Symbol с динамической палитрой |
 | OCR / Approach S | ⛔ **Удалён из прода (2026-09-14)** | Удалён из рантайма; `NSScreenCaptureUsageDescription` отсутствует; сохраняется только scoring-флаг |
 | Юнит-тесты | ✅ 61/61 passed (на момент последней проверки) | 61 тест / 0 failures: `AlgorithmStressTests`, `FrequencyAndCaptureTests`, `LayoutMapperTests`, `LogRegressionTests`, `SyntheticKeyRegressionTests` |
-| Сборка и релиз | 🟡 Локально 1.3.5 / build 6, GitHub Release не опубликован | DMG собран локально; Apple Development (Team ID `3ZMM724J2P`), Hardened Runtime, без notarization; репо private, публикация — по команде владельца |
+| Сборка и релиз | ✅ [GitHub Release v1.3.5](https://github.com/zevatov/ReTypeR/releases/tag/v1.3.5) опубликован | DMG 4.0 МБ в Release; сборка 1.3.5 / build 6; Apple Development (Team ID `3ZMM724J2P`), Hardened Runtime, без notarization; репо private до открытия владельцем |
 | Минималистичный апдейтер | ✅ реализован | [`UpdateChecker.swift`](../Sources/Services/UpdateChecker.swift): один GET-запрос `releases/latest` при открытии настроек, бейдж «Доступна X», тихий «актуально» при отсутствии релиза/сети |
 | Privacy opt-in | ✅ | История opt-in (`isHistoryEnabled`); журнал opt-in (`isConversionLogEnabled`) |
 | Документация | ✅ синхронизирована | [`docs/SETTINGS_GUIDE.md`](SETTINGS_GUIDE.md), [`docs/AGENT_PIPELINE.md`](AGENT_PIPELINE.md), [`docs/ARCHITECTURE_V13.md`](ARCHITECTURE_V13.md), [`README.md`](../README.md) со скриншотами |
