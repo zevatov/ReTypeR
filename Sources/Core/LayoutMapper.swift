@@ -104,6 +104,15 @@ class LayoutMapper {
             }
         }
         
+        // Headless CI (macos-15): kTISPropertyUnicodeKeyLayoutData is non-nil,
+        // but UCKeyTranslate yields no pairs. Do not overwrite a live TIS map.
+        if aToB.isEmpty, Self.isHardcodedUSRussianPair(layoutAID, layoutBID) {
+            fillHardcodedUSRussianMaps(layoutAID: layoutAID)
+            NSLog("[LayoutMapper] TIS layout data produced 0 entries; using hardcoded fallback map")
+            NSLog("[LayoutMapper] Built bidirectional map with %d entries between %@ and %@", aToBMap.count, layoutAID, layoutBID)
+            return
+        }
+        
         self.aToBMap = aToB
         self.bToAMap = bToA
         NSLog("[LayoutMapper] Built bidirectional map with %d entries between %@ and %@", aToB.count, layoutAID, layoutBID)
@@ -243,17 +252,23 @@ class LayoutMapper {
     
     // MARK: - Private Helpers
     
+    /// US/ABC ↔ Mac Russian in the direction of layout A. Shared by the nil-data
+    /// path and the empty UCKeyTranslate path so the table is not duplicated.
+    private func fillHardcodedUSRussianMaps(layoutAID: String) {
+        let usToRU = Self.fallbackUStoRU
+        let ruToUS = Dictionary(uniqueKeysWithValues: usToRU.map { ($0.value, $0.key) })
+        if Self.isUSABCLayout(layoutAID) {
+            aToBMap = usToRU
+            bToAMap = ruToUS
+        } else {
+            aToBMap = ruToUS
+            bToAMap = usToRU
+        }
+    }
+    
     private func applyHardcodedFallbackOrClear(layoutAID: String, layoutBID: String, sourcesMissing: Bool) {
         if Self.isHardcodedUSRussianPair(layoutAID, layoutBID) {
-            let usToRU = Self.fallbackUStoRU
-            let ruToUS = Dictionary(uniqueKeysWithValues: usToRU.map { ($0.value, $0.key) })
-            if Self.isUSABCLayout(layoutAID) {
-                aToBMap = usToRU
-                bToAMap = ruToUS
-            } else {
-                aToBMap = ruToUS
-                bToAMap = usToRU
-            }
+            fillHardcodedUSRussianMaps(layoutAID: layoutAID)
             NSLog("[LayoutMapper] Using hardcoded fallback map (TIS API unavailable in headless environment)")
             NSLog("[LayoutMapper] Built bidirectional map with %d entries between %@ and %@", aToBMap.count, layoutAID, layoutBID)
             return
